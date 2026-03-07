@@ -1,0 +1,60 @@
+{
+  "name": "@smart-dooh/source",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "start:api": "nx serve backend-api",
+    "seed:density": "ts-node prisma/seed-density.ts"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "private": true,
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.13",
+    "@nx/eslint": "22.4.5",
+    "@nx/eslint-plugin": "22.4.5",
+    "@nx/js": "22.4.5",
+    "@nx/workspace": "22.4.5",
+    "@swc-node/register": "~1.9.1",
+    "@swc/core": "~1.5.7",
+    "@swc/helpers": "~0.5.11",
+    "@types/jest": "^29.5.0",
+    "@types/node": "20.19.9",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
+    "eslint": "~8.57.0",
+    "eslint-config-prettier": "^10.0.0",
+    "jest": "^29.7.0",
+    "jsonc-eslint-parser": "^2.1.0",
+    "nx": "22.4.5",
+    "prettier": "~3.6.2",
+    "prisma": "~5.22.0",
+    "ts-jest": "^29.1.0",
+    "tslib": "^2.3.0",
+    "typescript": "~5.9.2",
+    "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "@fastify/static": "^9.0.0",
+    "@nestjs/common": "^11.1.13",
+    "@nestjs/core": "^11.1.13",
+    "@nestjs/platform-fastify": "^11.1.13",
+    "@nestjs/swagger": "^11.2.6",
+    "@prisma/client": "~5.22.0",
+    "@sentry/node": "^8.0.0",
+    "@willsoto/nestjs-prometheus": "^6.0.0",
+    "axios": "^1.13.4",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.9.2",
+    "nestjs-pino": "^4.2.0",
+    "pino-http": "^10.0.0",
+    "prom-client": "^15.1.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "stripe": "^17.0.0"
+  }
+}

@@ -1,0 +1,36 @@
+---
+description: Run restart, migrate, seed, and Prisma generate yourself; do not ask the user to do it.
+alwaysApply: true
+---
+
+# Run operations yourself
+
+When this project needs any of the following, **run the commands yourself** in the workspace. Do not tell the user to restart, migrate, or seed—do it.
+
+## When to run what
+
+- **Schema or enum changes (Prisma)**  
+  - `npx prisma migrate deploy` (or create migration if needed)  
+  - `npx prisma generate`  
+  - If processes lock the client: stop backend (and Prisma Studio if needed) by killing the PID on port 3000 / 5556, then run `npx prisma generate`, then start backend (and Prisma Studio if desired) again.
+
+- **Seed data or seed logic changed**  
+  - `npx prisma db seed`
+
+- **Backend .env or code changed (rate limit, env flags, etc.)**  
+  - Stop the process on port 3000 (e.g. `taskkill /PID <pid> /F` after `netstat -ano | findstr ":3000"`), then start again: `npx nx serve backend-api` (in background if appropriate).
+
+- **Mobile app code changed**  
+  - You cannot restart the app on the user’s device. Tell them to reload (Expo: shake → Reload) only when the change is in the app and they need to pick it up.
+
+## Commands to run (Windows / PowerShell)
+
+- Find PID: `netstat -ano | findstr ":3000"` or `:5556`
+- Stop: `taskkill /PID <pid> /F`
+- Migrate: `cd c:\Users\asaf0\smart-dooh; npx prisma migrate deploy`
+- Generate: `cd c:\Users\asaf0\smart-dooh; npx prisma generate`
+- Seed: `cd c:\Users\asaf0\smart-dooh; npx prisma db seed`
+- Start backend: `cd c:\Users\asaf0\smart-dooh; npx nx serve backend-api` (use `is_background: true` for long-running)
+- Start Prisma Studio: `cd c:\Users\asaf0\smart-dooh; npx prisma studio` (use `is_background: true`)
+
+Run these in the project root (`c:\Users\asaf0\smart-dooh`). Use `;` in PowerShell to chain commands if needed.

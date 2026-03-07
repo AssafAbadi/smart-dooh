@@ -1,0 +1,43 @@
+╔══════════════════════════════════════════════════════════╗
+║           COPY THIS URL TO YOUR EXPO GO APP              ║
+╠══════════════════════════════════════════════════════════╣
+║                                                          ║
+║  exp://172.20.10.2:19000                                ║
+║                                                          ║
+║  OR TRY THIS:                                           ║
+║  exp://192.168.56.1:19000                               ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
+
+HOW TO USE IT ON YOUR IPHONE:
+==============================
+
+1. Open Expo Go app
+2. On the home screen (Development servers section)
+3. Pull DOWN from top to reveal URL input
+4. Type the URL above  
+5. Press Enter/Go
+
+OR:
+
+1. Shake your iPhone (while in Expo Go)
+2. Developer menu appears
+3. Look for "Enter URL" or "Connection"
+4. Type the URL above
+
+OR:
+
+1. Tap "Settings" tab at bottom
+2. Look for "Enter URL manually"
+3. Type the URL above
+
+==============================
+
+WHAT HAPPENS NEXT:
+- App says "Opening project..."
+- Then "Building bundle..." (takes 3-5 min first time!)
+- Then your app loads!
+
+DON'T GIVE UP - first time is SLOW but it WORKS!
+
+==============================

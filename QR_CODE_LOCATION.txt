@@ -1,0 +1,63 @@
+===============================================
+EXPO QR CODE - WHERE TO FIND IT
+===============================================
+
+Your Expo server is running at:
+Process ID (PID): 26400
+Port: 19000
+Started: 2026-02-12T17:16:38
+
+Terminal File Location:
+C:\Users\asaf0\.cursor\projects\c-Users-asaf0-smart-dooh\terminals\653837.txt
+
+===============================================
+HOW TO SEE THE QR CODE:
+===============================================
+
+Option 1: LOOK AT YOUR COMMAND PROMPT/TERMINAL
+---------------------------------------------
+Find the window where you ran "npx expo start"
+Look for output like this:
+
+› Metro waiting on exp://172.20.10.2:19000
+› Scan the QR code above
+
+    ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+    █ ▄▄▄▄▄ █ ▀█ █ ▄▄▄▄▄ █
+    █ █   █ █▄▀▄█ █   █ █
+    ... (QR CODE HERE)
+
+This appears AFTER Metro finishes compiling.
+First time takes 1-3 minutes.
+
+Option 2: USE URL DIRECTLY IN EXPO GO
+---------------------------------------------
+In Expo Go app on iPhone:
+- Pull down to reveal URL input
+- Or tap Settings tab
+- Enter: exp://172.20.10.2:19000
+
+Option 3: IPHONE CAMERA (When QR Appears)
+---------------------------------------------
+1. Open Camera app
+2. Point at QR code on computer screen
+3. Tap "Open in Expo Go" banner
+
+===============================================
+CURRENT STATUS:
+===============================================
+
+✅ Expo: RUNNING
+✅ Metro: COMPILING  
+⏳ QR Code: WILL APPEAR (wait 1-2 more min)
+✅ Port: 19000 (not 8081!)
+
+===============================================
+WHAT TO DO NOW:
+===============================================
+
+1. WAIT for QR code in terminal (1-2 min)
+2. OR try entering URL in Expo Go now
+3. Use: exp://172.20.10.2:19000
+
+===============================================

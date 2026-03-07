@@ -1,0 +1,43 @@
+{
+  "name": "backend-api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backend-api/src",
+  "projectType": "application",
+  "tags": ["scope:api", "type:app"],
+  "targets": {
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx prisma generate",
+        "cwd": "."
+      },
+      "outputs": ["{workspaceRoot}/node_modules/.prisma"]
+    },
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/backend-api",
+        "main": "apps/backend-api/src/main.ts",
+        "tsConfig": "apps/backend-api/tsconfig.app.json"
+      },
+      "configurations": {
+        "production": {
+          "optimization": true
+        }
+      },
+      "dependsOn": []
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "set NODE_PATH=dist && node dist/apps/backend-api/src/main.js",
+        "cwd": "."
+      },
+      "configurations": {
+        "production": {}
+      },
+      "dependsOn": ["build"]
+    }
+  }
+}

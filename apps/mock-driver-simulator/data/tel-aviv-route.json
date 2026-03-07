@@ -1,0 +1,17 @@
+{
+  "type": "Feature",
+  "properties": { "name": "Tel Aviv route (Rothschild to Dizengoff)" },
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [34.7718, 32.0642],
+      [34.7728, 32.0650],
+      [34.7740, 32.0655],
+      [34.7752, 32.0660],
+      [34.7765, 32.0662],
+      [34.7780, 32.0665],
+      [34.7795, 32.0668],
+      [34.7810, 32.0670]
+    ]
+  }
+}

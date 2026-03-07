@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": false,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@smart-dooh/shared-dto": ["libs/shared/dto/src/index.ts"],
+      "@smart-dooh/shared-dto/*": ["libs/shared/dto/src/*"],
+      "@smart-dooh/shared-utils": ["libs/shared/utils/src/index.ts"],
+      "@smart-dooh/shared-utils/*": ["libs/shared/utils/src/*"],
+      "@smart-dooh/shared-sdk": ["libs/shared/sdk/src/index.ts"],
+      "@smart-dooh/shared-sdk/*": ["libs/shared/sdk/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}

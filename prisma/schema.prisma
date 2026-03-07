@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Tags on a business (what the place is). Dietary/kosher/alcohol apply only when RESTAURANT is set.
+enum BusinessTag {
+  RESTAURANT
+  SERVES_ALCOHOL
+  KOSHER
+  VEGAN
+  VEGETARIAN
+  GAMBLING
+}
+
+/// Driver preference filters (what the driver wants). Matching is rule-based, not hasEvery.
+enum PreferenceFilter {
+  NO_ALCOHOL
+  KOSHER_ONLY
+  UNKOSHER_ONLY
+  VEGAN_ONLY
+  VEGETARIAN_ONLY
+  NO_GAMBLING
+}
+
+model Driver {
+  id         String             @id @default(uuid())
+  balance   Float              @default(0) // ILS, updated in real-time per estimated impression
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  preferences DriverPreferences?
+  carScreens CarScreen[]
+}
+
+model DriverPreferences {
+  id                 String     @id @default(uuid())
+  driverId           String     @unique
+  driver             Driver     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  preference_tags    PreferenceFilter[] @default([])
+  excludedLanguages  String[]   @default([])
+}
+
+model Business {
+  id                   String                 @id @default(uuid())
+  name                 String
+  tags                 BusinessTag[]         @default([]) // RESTAURANT + dietary/alc/gambling; filtering uses preference rules
+  language             String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  campaigns            Campaign[]
+  targetingPreferences TargetingPreferences?
+}
+
+/// Weather and proximity targeting per business (1:1). DB columns snake_case via @map.
+model TargetingPreferences {
+  id                 String   @id @default(uuid())
+  businessId         String   @unique
+  business           Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  minTemp            Float?   @map("min_temp")
+  maxTemp            Float?   @map("max_temp")
+  weatherCondition   String?  @map("weather_condition") // Rain, Sun, Clear, etc.
+  proximityTriggers  Json?    @map("proximity_triggers") // JSON array e.g. ['beach','gym','office_area']
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model CarScreen {
+  id             String   @id @default(uuid())
+  deviceId       String   @unique
+  driverId       String?
+  driver         Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  lastHeartbeat DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model EmergencyAlert {
+  id            String   @id @default(uuid())
+  headline      String
+  body          String?
+  active        Boolean  @default(true)
+  lat           Float
+  lng           Float
+  radiusMeters  Int      @default(500)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Campaign {
+  id               String    @id @default(uuid())
+  businessId       String
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  cpm              Int       // cents or basis
+  budgetRemaining  Int       // remaining budget units
+  ratePerReach     Float?    // ILS per estimated reach (for driver revenue)
+  active           Boolean   @default(true)
+  geofence         Json?     // { type: 'circle', lat, lng, radiusMeters } or { type: 'polygon', coordinates: [[lng,lat],...] }
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  creatives        Creative[]
+}
+
+model Creative {
+  id           String        @id @default(uuid())
+  campaignId   String
+  campaign     Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  headline     String
+  body         String?
+  imageUrl     String?
+  couponCode   String?
+  variantId    String?
+  status       CreativeStatus @default(PENDING)
+  trendContext String?       // optional: trend headline that inspired this creative
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+enum CreativeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Impression {
+  id         String   @id @default(uuid())
+  clientUuid String   @unique(map: "impression_client_uuid_key")
+  campaignId String
+  creativeId String
+  deviceId   String
+  driverId   String?
+  lat        Float
+  lng        Float
+  geohash    String
+  createdAt  DateTime @default(now())
+}
+
+model Redemption {
+  id          String   @id @default(uuid())
+  impressionId String?
+  campaignId  String
+  creativeId  String
+  couponCode  String?
+  redeemedAt DateTime @default(now())
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  businessId    String
+  amountCents   Int           // amount in cents (or agorot for ILS)
+  currency      String        @default("ILS")
+  provider      String        // 'stripe' or 'tranzila'
+  providerTxId  String?       // external transaction ID
+  status        PaymentStatus @default(PENDING)
+  campaignId    String?       // optional: which campaign this payment is for
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model DriverEarnings {
+  id               String   @id @default(uuid())
+  driverId         String
+  periodStart      DateTime
+  periodEnd        DateTime
+  impressionCount  Int
+  earningsILS      Float    // impressionCount * 0.05
+  paidOut          Boolean  @default(false)
+  payoutId         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([driverId, periodStart])
+}
+
+model Payout {
+  id          String   @id @default(uuid())
+  driverId    String
+  amountILS   Float
+  bankDetails Json?    // { accountNumber, bankCode, branchCode } for Israeli banks
+  status      String   @default("pending") // pending, processing, completed, failed
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Traffic density by location and time (geohash level 7). Used by ImpressionEstimatorService.
+model TrafficDensity {
+  id          String   @id @default(uuid())
+  geohash     String   // level 7 (~150m grid)
+  dayOfWeek   Int      // 0=Sunday .. 6=Saturday (Israeli week)
+  hour        Int      // 0-23
+  baseDensity Float    // e.g. 0-100 scale or people per hour
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([geohash, dayOfWeek, hour])
+  @@index([geohash, dayOfWeek, hour])
+}
+
+/// Live events (e.g. Bloomfield Stadium) for location-based reach boost.
+model LiveEvent {
+  id          String   @id @default(uuid())
+  name        String
+  lat         Float
+  lng         Float
+  radius      Float    // meters
+  boostFactor Float    // e.g. 1.5
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
