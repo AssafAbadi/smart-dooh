@@ -2,39 +2,34 @@
 
 ## Current Status
 
-- **Git**: The project folder is now a **git repository** (initialized and with one commit containing the full codebase and docs).
-- **GitHub**: There is **no remote** yet. When you created the project with EAS/Expo, it may have created a repo in a **different directory** or under an Expo/GitHub integration—this folder was **not** previously a git repo, so nothing from here was on GitHub.
+- **Git**: The project is a git repository with two commits (full codebase + mobile-driver as regular files).
+- **Remote**: `origin` is set to **https://github.com/Assafabadi/smart-dooh.git**. Create the repo on GitHub (step 1) before pushing.
 
 ## What You Need to Do
 
-### 1. Create a new repository on GitHub
+### 1. Create the repository on GitHub (one-time)
 
-1. Log in to [GitHub](https://github.com) (username: **Assafabadi**).
-2. Click **New repository** (or go to https://github.com/new).
-3. Choose a name (e.g. `smart-dooh` or `adrive`).
-4. Leave it **empty** (no README, no .gitignore—we already have them).
-5. Create the repository.
+**Quick link** (create repo named `smart-dooh` under Assafabadi):  
+**[https://github.com/new?name=smart-dooh](https://github.com/new?name=smart-dooh)**
 
-### 2. Add the remote and push
+1. Log in to [GitHub](https://github.com) as **Assafabadi**.
+2. Open the link above (or go to https://github.com/new and set repository name to `smart-dooh`).
+3. Leave **"Add a README file"** and **".gitignore"** **unchecked** (we already have them).
+4. Click **Create repository**.
+
+### 2. Push (after creating the repo)
 
 In a terminal, from the **project root** (`c:\Users\asaf0\smart-dooh`):
 
 ```powershell
-# For Assafabadi / smart-dooh:
-git remote add origin https://github.com/Assafabadi/smart-dooh.git
-git branch -M main
 git push -u origin main
 ```
 
-If you use SSH:
+(Remote `origin` is already set to `https://github.com/Assafabadi/smart-dooh.git`. If you ever need to add it again: `git remote add origin https://github.com/Assafabadi/smart-dooh.git`.)
 
-```powershell
-git remote add origin git@github.com:Assafabadi/smart-dooh.git
-git branch -M main
-git push -u origin main
-```
+To use SSH instead of HTTPS, change the remote: `git remote set-url origin git@github.com:Assafabadi/smart-dooh.git`, then run `git push -u origin main`.
 
-### 3. If you use GitHub CLI (`gh`)
+### 3. Optional: GitHub CLI (`gh`)
 
 From the project root:
 
@@ -48,10 +43,7 @@ gh repo create smart-dooh --private --source=. --remote=origin --push
 
 ## Note about `apps/mobile-driver`
 
-If `apps/mobile-driver` was added as a **git submodule** (mode 160000), it points to another repo. To push everything in one repo instead:
-
-- Remove the submodule and add the mobile app as normal files (if you have the files in this workspace), then commit again; or  
-- Keep the submodule and run `git submodule update --init` after cloning; then push the main repo and ensure the submodule’s repo is also on GitHub if you use it separately.
+`apps/mobile-driver` is now tracked as **regular files** in this repo (the previous gitlink/submodule was removed), so one push uploads the full project including the mobile app.
 
 ---
 
