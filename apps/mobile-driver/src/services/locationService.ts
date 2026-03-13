@@ -5,7 +5,7 @@ import { useLocationStore } from '../stores/locationStore';
 const LOCATION_TASK_NAME = 'adrive-background-location';
 
 /** Simple geohash (precision ~5km) for cache/API keys. */
-function simpleGeohash(lat: number, lng: number): string {
+export function simpleGeohash(lat: number, lng: number): string {
   const latStr = Math.floor((lat + 90) / 5).toString(36);
   const lngStr = Math.floor((lng + 180) / 5).toString(36);
   return `${latStr}-${lngStr}`;
@@ -47,13 +47,41 @@ export async function requestLocationPermission(): Promise<PermissionResult> {
   }
 }
 
+/** Foreground: watch position so distance updates when you move (e.g. across the house). */
+export function startForegroundWatch(
+  setLocation: (lat: number, lng: number, geohash: string) => void
+): () => void {
+  let subscription: { remove: () => void } | null = null;
+  Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 4000,
+      distanceInterval: 5,
+    },
+    (loc) => {
+      const { latitude, longitude } = loc.coords;
+      setLocation(latitude, longitude, simpleGeohash(latitude, longitude));
+    }
+  )
+    .then((sub) => {
+      subscription = sub;
+    })
+    .catch((e) => {
+      console.warn('[locationService] watchPositionAsync failed', (e as Error)?.message ?? e);
+    });
+  return () => {
+    subscription?.remove();
+    subscription = null;
+  };
+}
+
 export async function startLocationUpdates(
   _setLocation: (lat: number, lng: number, geohash: string) => void
 ): Promise<() => void> {
   await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
     accuracy: Location.Accuracy.Balanced,
     timeInterval: 5000,
-    distanceInterval: 50,
+    distanceInterval: 10,
     foregroundService: {
       notificationTitle: 'Adrive',
       notificationBody: 'Updating location for nearby ads.',

@@ -11,6 +11,9 @@ export const adInstructionSchema = z.object({
   couponCode: z.string().optional(),
   ttlSeconds: z.number().optional(),
   priority: z.number().optional(),
+  distanceMeters: z.number().optional(),
+  businessLat: z.number().optional(),
+  businessLng: z.number().optional(),
 });
 
 export type AdInstruction = z.infer<typeof adInstructionSchema>;

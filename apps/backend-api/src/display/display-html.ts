@@ -87,15 +87,22 @@ export function getDisplayHtml(driverId: string): string {
       return div.innerHTML;
     }
 
+    function replacePlaceholders(text, instruction) {
+      if (!text) return '';
+      var dist = (instruction.distanceMeters != null) ? (Math.round(instruction.distanceMeters) + 'm') : '—';
+      var code = instruction.couponCode || '—';
+      return text.split('[DISTANCE]').join(dist).split('[TIME_LEFT]').join('—').split('[COUPON_CODE]').join(code);
+    }
     function render(instruction, useFade) {
       if (!instruction) {
         root.innerHTML = '<div class="headline">No ad</div><div class="body">No active campaign in range.</div>';
         lastAdKey = '';
         return;
       }
-      const headline = escapeHtml(instruction.headline || 'Special offer');
-      const body = (instruction.body || '').replace(/\\[DISTANCE\\]/g, '—').replace(/\\[TIME_LEFT\\]/g, '—').replace(/\\[COUPON_CODE\\]/g, instruction.couponCode || '—');
-      const bodyEscaped = escapeHtml(body);
+      const headlineRaw = replacePlaceholders(instruction.headline || 'Special offer', instruction);
+      const bodyRaw = replacePlaceholders(instruction.body || '', instruction);
+      const headline = escapeHtml(headlineRaw);
+      const bodyEscaped = escapeHtml(bodyRaw);
       const coupon = escapeHtml(instruction.couponCode || '');
       if (useFade) {
         root.classList.remove('fade-enter');
@@ -106,7 +113,9 @@ export function getDisplayHtml(driverId: string): string {
     }
 
     function fetchAds() {
-      fetch(API_BASE + '/ad-selection/last/' + encodeURIComponent(driverId), { headers: { 'Accept': 'application/json' } })
+      var headers = { 'Accept': 'application/json' };
+      if (window.location.hostname.indexOf('ngrok') !== -1) headers['ngrok-skip-browser-warning'] = '1';
+      fetch(API_BASE + '/ad-selection/last/' + encodeURIComponent(driverId), { headers: headers })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(data) {
           var first = data && data.instructions && data.instructions[0];

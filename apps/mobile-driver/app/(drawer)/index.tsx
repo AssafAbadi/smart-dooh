@@ -9,6 +9,32 @@ import { AdSlot } from '../../src/components/AdSlot';
 import { colors } from '../../src/theme/colors';
 
 const DEFAULT_DRIVER_ID = 'driver-1';
+const LIVE_DISTANCE_INTERVAL_MS = 5000;
+
+/** Approximate distance in meters between two WGS84 points (haversine). */
+function distanceMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371000; // Earth radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function formatDistance(m: number): string {
+  if (m < 1000) return `${Math.round(m)}m`;
+  return `${(m / 1000).toFixed(1)}km`;
+}
 
 export default function HomeScreen() {
   const { lat, lng, isSimulated } = useLocationStore();
@@ -28,19 +54,40 @@ export default function HomeScreen() {
     COUPON_CODE: '—',
   });
   const isOnline = lat != null && lng != null;
+  const slot1 = instructions[0] ?? null;
 
+  // Set COUPON_CODE and initial DISTANCE when instruction or location changes
   useEffect(() => {
-    if (lat != null && lng != null) {
-      setPlaceholders((p) => ({
+    const inst = instructions[0];
+    if (!inst) return;
+    setPlaceholders((p) => {
+      let DISTANCE = p.DISTANCE;
+      if (lat != null && lng != null && inst.businessLat != null && inst.businessLng != null) {
+        DISTANCE = formatDistance(distanceMeters(lat, lng, inst.businessLat, inst.businessLng));
+      } else if (inst.distanceMeters != null) {
+        DISTANCE = formatDistance(inst.distanceMeters);
+      }
+      return {
         ...p,
-        DISTANCE: '300m',
+        DISTANCE,
         TIME_LEFT: '45 min',
-        COUPON_CODE: instructions[0]?.couponCode ?? '—',
-      }));
-    }
+        COUPON_CODE: inst.couponCode ?? '—',
+      };
+    });
   }, [lat, lng, instructions]);
 
-  const slot1 = instructions[0] ?? null;
+  // Every 5s refresh distance from phone to current ad's business for live updates
+  useEffect(() => {
+    function tick() {
+      const inst = instructions[0];
+      if (lat == null || lng == null || inst?.businessLat == null || inst?.businessLng == null) return;
+      const m = distanceMeters(lat, lng, inst.businessLat, inst.businessLng);
+      setPlaceholders((p) => ({ ...p, DISTANCE: formatDistance(m) }));
+    }
+    const id = setInterval(tick, LIVE_DISTANCE_INTERVAL_MS);
+    tick();
+    return () => clearInterval(id);
+  }, [lat, lng, instructions]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

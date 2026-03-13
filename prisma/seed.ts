@@ -81,19 +81,19 @@ const ROUTE_8_POINTS = [
 ] as const;
 const GEOFENCE_RADIUS_M = 280; // Only one or two campaigns in range per simulator point
 
-/** Real businesses – 600m radius so you get ads when ~500m from a venue (e.g. 32.072, 34.769 near Hayarkon). */
-const REAL_BUSINESSES_RADIUS_M = 600;
+/** Real businesses – 100m radius so the ad shown is for the venue you're actually near. */
+const REAL_BUSINESSES_RADIUS_M = 100;
 const REAL_BUSINESSES = [
   {
     name: 'Nabi Yuna',
     language: 'he',
     tags: [BusinessTag.RESTAURANT, BusinessTag.KOSHER] as BusinessTagType[],
-    lat: 32.0618,
-    lng: 34.7628,
+    lat: 32.07199,
+    lng: 34.76909,
     headline: '20% off at Nabi Yuna – use code [COUPON_CODE]',
-    body: 'Café & restaurant on Yona Hanavi. [DISTANCE] away.',
+    body: 'Yona Hanavi 43, Tel Aviv. [DISTANCE] away.',
     couponCode: 'NABI20',
-    cpm: 450,
+    cpm: 300,
     budgetRemaining: 100_000,
   },
   {
@@ -167,6 +167,18 @@ const REAL_BUSINESSES = [
     couponCode: '—',
     cpm: 350,
     budgetRemaining: 50_000,
+  },
+  {
+    name: 'Rambam Shawarma',
+    language: 'he',
+    tags: [BusinessTag.RESTAURANT, BusinessTag.KOSHER] as BusinessTagType[],
+    lat: 32.0681985,
+    lng: 34.7688763,
+    headline: 'Shawarma at Rambam – [COUPON_CODE] just for you',
+    body: 'Rambam 3, Carmel Market. [DISTANCE] away.',
+    couponCode: 'RAMBAM10',
+    cpm: 420,
+    budgetRemaining: 70_000,
   },
 ] as const;
 

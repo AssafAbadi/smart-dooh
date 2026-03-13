@@ -47,6 +47,11 @@ export interface AdInstructionResult {
   priority?: number;
   /** Set from candidate; absent for emergency override. Used to ensure only ads from allowed businesses are returned. */
   businessId?: string;
+  /** Distance from request location to campaign geofence center (for display and live app distance). */
+  distanceMeters?: number;
+  /** Geofence center so the app can compute distance client-side for live updates. */
+  businessLat?: number;
+  businessLng?: number;
 }
 
 /**

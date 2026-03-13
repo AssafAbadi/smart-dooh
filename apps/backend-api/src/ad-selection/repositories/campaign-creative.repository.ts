@@ -93,22 +93,22 @@ export class CampaignCreativeRepository {
     return R * c;
   }
 
-  /** For logging: distance and radius per campaign so you can see why a business is in/out of radius. */
+  /** For logging and display: distance, radius, and geofence center per campaign. */
   async getCampaignDistances(
     businessIds: string[],
     lat: number,
     lng: number
-  ): Promise<{ businessId: string; campaignId: string; distanceMeters: number; radiusMeters: number; inRange: boolean }[]> {
+  ): Promise<{ businessId: string; campaignId: string; distanceMeters: number; radiusMeters: number; inRange: boolean; lat: number; lng: number }[]> {
     if (businessIds.length === 0) return [];
     const campaigns = await this.prisma.campaign.findMany({
       where: { businessId: { in: businessIds }, active: true },
       select: { id: true, businessId: true, geofence: true },
     });
-    const out: { businessId: string; campaignId: string; distanceMeters: number; radiusMeters: number; inRange: boolean }[] = [];
+    const out: { businessId: string; campaignId: string; distanceMeters: number; radiusMeters: number; inRange: boolean; lat: number; lng: number }[] = [];
     for (const c of campaigns) {
       const geo = c.geofence as { type?: string; lat?: number; lng?: number; radiusMeters?: number } | null;
       if (!geo || geo.type !== 'circle' || typeof geo.lat !== 'number' || typeof geo.lng !== 'number' || typeof geo.radiusMeters !== 'number') {
-        out.push({ businessId: c.businessId, campaignId: c.id, distanceMeters: 0, radiusMeters: 0, inRange: true });
+        out.push({ businessId: c.businessId, campaignId: c.id, distanceMeters: 0, radiusMeters: 0, inRange: true, lat: lat, lng: lng });
         continue;
       }
       const dist = this.distanceMeters(geo, lat, lng) ?? 0;
@@ -118,6 +118,8 @@ export class CampaignCreativeRepository {
         distanceMeters: Math.round(dist),
         radiusMeters: geo.radiusMeters,
         inRange: dist <= geo.radiusMeters,
+        lat: geo.lat,
+        lng: geo.lng,
       });
     }
     return out;

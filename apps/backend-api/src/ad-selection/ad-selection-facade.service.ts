@@ -85,14 +85,23 @@ export class AdSelectionFacade {
       })),
     });
     const input = await this.prepareInputForGetRanked(query, candidates);
-    const instructions = await this.runEngineAndRecordLatency(input);
+    let instructions = await this.runEngineAndRecordLatency(input);
+    const distanceByBusinessId = new Map(distances.map((d) => [d.businessId, d]));
+    instructions = instructions.map((i) => {
+      const dist = i.businessId ? distanceByBusinessId.get(i.businessId) : undefined;
+      return {
+        ...i,
+        distanceMeters: dist?.distanceMeters,
+        businessLat: dist?.lat,
+        businessLng: dist?.lng,
+      };
+    });
     this.logger.log({
       driverId,
       candidatesCount: candidates.length,
       instructionsCount: instructions.length,
       msg: 'GET ranked result',
     });
-    const distanceByBusinessId = new Map(distances.map((d) => [d.businessId, d]));
     this.logger.log({
       msg: 'Ranked order (bidding result)',
       lat,
