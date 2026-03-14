@@ -5,7 +5,9 @@ import type { DriverLocationBodyDto } from '@smart-dooh/shared-dto';
 import { GeocodingService, type ReverseGeocodeResult } from '../external-api/geocoding.service';
 
 const DRIVER_LOCATION_KEY_PREFIX = 'driver:location:';
+const DRIVER_POSITION_KEY_PREFIX = 'driver:position:';
 const DRIVER_LOCATION_TTL_SEC = 300; // 5 min
+const DRIVER_POSITION_TTL_SEC = 30;
 
 export interface StoredDriverLocation {
   lat: number;
@@ -48,7 +50,11 @@ export class DriverLocationService {
     };
 
     if (client) {
-      await client.setex(key, DRIVER_LOCATION_TTL_SEC, JSON.stringify(payload));
+      const posKey = `${DRIVER_POSITION_KEY_PREFIX}${body.driverId}`;
+      await Promise.all([
+        client.setex(key, DRIVER_LOCATION_TTL_SEC, JSON.stringify(payload)),
+        client.setex(posKey, DRIVER_POSITION_TTL_SEC, JSON.stringify({ lat: body.lat, lng: body.lng, updatedAt: Date.now() })),
+      ]);
     }
 
     this.logger.log({

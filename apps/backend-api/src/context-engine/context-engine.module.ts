@@ -4,11 +4,12 @@ import { BusinessRepository } from '../business/repositories/business.repository
 import { DriverPreferencesRepository } from '../business/repositories/driver-preferences.repository';
 import { ExternalApiModule } from '../external-api/external-api.module';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
+import { RedisModule } from '../redis/redis.module';
 import { ContextEngineController } from './context-engine.controller';
 import { ContextEngineService } from './context-engine.service';
 
 @Module({
-  imports: [ExternalApiModule, RateLimitModule],
+  imports: [ExternalApiModule, RateLimitModule, RedisModule],
   controllers: [ContextEngineController],
   providers: [
     ContextEngineService,

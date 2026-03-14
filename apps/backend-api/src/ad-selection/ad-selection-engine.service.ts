@@ -3,17 +3,15 @@ import type { AdSelectionStrategy, SelectionInput, AdInstructionResult } from '.
 import { candidateToInstruction } from './strategies/strategy-helpers';
 import { EmergencyRulesStrategy } from './strategies/emergency-rules.strategy';
 import { ProximityStrategy } from './strategies/proximity.strategy';
-import { PaidPriorityStrategy } from './strategies/paid-priority.strategy';
 import { EventBoostStrategy } from './strategies/event-boost.strategy';
-import { ContextRulesStrategy } from './strategies/context-rules.strategy';
+import { AdRankStrategy } from './strategies/ad-rank.strategy';
 
 /**
  * AdSelectionEngine: Runs strategy chain in order.
  * 1. EmergencyRulesStrategy → override if alert at location
  * 2. ProximityStrategy → boost BLE IMMEDIATE business
- * 3. PaidPriorityStrategy → sort by CPM, budget
- * 4. EventBoostStrategy → multiply priority by live event boost near venues
- * 5. ContextRulesStrategy → match weather, time, POI density
+ * 3. EventBoostStrategy → multiply priority by live event boost near venues
+ * 4. AdRankStrategy → bid * quality * relevance * pacing + freq caps + SOV + weighted sampling
  */
 @Injectable()
 export class AdSelectionEngineService {
@@ -22,11 +20,10 @@ export class AdSelectionEngineService {
   constructor(
     emergency: EmergencyRulesStrategy,
     proximity: ProximityStrategy,
-    paid: PaidPriorityStrategy,
     eventBoost: EventBoostStrategy,
-    context: ContextRulesStrategy
+    adRank: AdRankStrategy,
   ) {
-    this.chain = [emergency, proximity, paid, eventBoost, context];
+    this.chain = [emergency, proximity, eventBoost, adRank];
   }
 
   async select(input: SelectionInput): Promise<AdInstructionResult[]> {

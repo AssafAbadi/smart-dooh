@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocationStore } from '../../src/stores/locationStore';
@@ -7,9 +7,11 @@ import { useSimulatorStore, SIMULATOR_DRIVER_ID } from '../../src/stores/simulat
 import { useDriverBalance } from '../../src/hooks/useDriverBalance';
 import { AdSlot } from '../../src/components/AdSlot';
 import { colors } from '../../src/theme/colors';
+import { getApiBase, apiHeaders } from '../../src/services/apiClient';
 
 const DEFAULT_DRIVER_ID = 'driver-1';
 const LIVE_DISTANCE_INTERVAL_MS = 5000;
+const DIRECTION_SYNC_INTERVAL_MS = 3000;
 
 /** Approximate distance in meters between two WGS84 points (haversine). */
 function distanceMeters(
@@ -36,8 +38,69 @@ function formatDistance(m: number): string {
   return `${(m / 1000).toFixed(1)}km`;
 }
 
+const DIRECTION_ARROWS: Record<string, string> = { up: '↑', down: '↓', left: '←', right: '→' };
+
+/** Bearing in degrees from (fromLat, fromLng) to (toLat, toLng). 0=N, 90=E, 180=S, 270=W. */
+function bearingDegrees(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLon = toRad(toLng - fromLng);
+  const y = Math.sin(dLon) * Math.cos(toRad(toLat));
+  const x =
+    Math.cos(toRad(fromLat)) * Math.sin(toRad(toLat)) -
+    Math.sin(toRad(fromLat)) * Math.cos(toRad(toLat)) * Math.cos(dLon);
+  let deg = (Math.atan2(y, x) * 180) / Math.PI;
+  if (deg < 0) deg += 360;
+  return deg;
+}
+
+/** Map bearing (0–360) to up / right / down / left. */
+function bearingToDirection(bearingDeg: number): 'up' | 'down' | 'left' | 'right' {
+  if (bearingDeg >= 315 || bearingDeg < 45) return 'up';
+  if (bearingDeg >= 45 && bearingDeg < 135) return 'right';
+  if (bearingDeg >= 135 && bearingDeg < 225) return 'down';
+  return 'left';
+}
+
+/** Relative direction from phone's perspective: bearing to business minus phone heading. */
+function relativeDirection(
+  userLat: number, userLng: number,
+  businessLat: number, businessLng: number,
+  phoneHeading: number
+): 'up' | 'down' | 'left' | 'right' {
+  const absolute = bearingDegrees(userLat, userLng, businessLat, businessLng);
+  const relative = ((absolute - phoneHeading) % 360 + 360) % 360;
+  return bearingToDirection(relative);
+}
+
+function distanceWithDirection(
+  m: number,
+  userLat: number | null,
+  userLng: number | null,
+  businessLat: number | null | undefined,
+  businessLng: number | null | undefined,
+  fallbackDirection?: 'up' | 'down' | 'left' | 'right',
+  phoneHeading?: number | null
+): string {
+  const dist = formatDistance(m);
+  let arrow = '';
+  if (userLat != null && userLng != null && businessLat != null && businessLng != null) {
+    const dir = phoneHeading != null
+      ? relativeDirection(userLat, userLng, businessLat, businessLng, phoneHeading)
+      : bearingToDirection(bearingDegrees(userLat, userLng, businessLat, businessLng));
+    arrow = (DIRECTION_ARROWS[dir] ?? '') + ' ';
+  } else if (fallbackDirection && DIRECTION_ARROWS[fallbackDirection]) {
+    arrow = DIRECTION_ARROWS[fallbackDirection] + ' ';
+  }
+  return arrow + dist;
+}
+
 export default function HomeScreen() {
-  const { lat, lng, isSimulated } = useLocationStore();
+  const { lat, lng, isSimulated, heading } = useLocationStore();
   const { simulatorMode } = useSimulatorStore();
   const driverId = simulatorMode ? SIMULATOR_DRIVER_ID : DEFAULT_DRIVER_ID;
   const { balance, refetch } = useDriverBalance(driverId);
@@ -56,16 +119,25 @@ export default function HomeScreen() {
   const isOnline = lat != null && lng != null;
   const slot1 = instructions[0] ?? null;
 
-  // Set COUPON_CODE and initial DISTANCE when instruction or location changes
+  // Set COUPON_CODE and initial DISTANCE (with heading-relative arrow) when instruction, location, or heading changes
   useEffect(() => {
     const inst = instructions[0];
     if (!inst) return;
     setPlaceholders((p) => {
       let DISTANCE = p.DISTANCE;
       if (lat != null && lng != null && inst.businessLat != null && inst.businessLng != null) {
-        DISTANCE = formatDistance(distanceMeters(lat, lng, inst.businessLat, inst.businessLng));
+        const m = distanceMeters(lat, lng, inst.businessLat, inst.businessLng);
+        DISTANCE = distanceWithDirection(m, lat, lng, inst.businessLat, inst.businessLng, undefined, heading);
       } else if (inst.distanceMeters != null) {
-        DISTANCE = formatDistance(inst.distanceMeters);
+        DISTANCE = distanceWithDirection(
+          inst.distanceMeters,
+          null,
+          null,
+          inst.businessLat,
+          inst.businessLng,
+          inst.direction,
+          heading
+        );
       }
       return {
         ...p,
@@ -74,20 +146,47 @@ export default function HomeScreen() {
         COUPON_CODE: inst.couponCode ?? '—',
       };
     });
-  }, [lat, lng, instructions]);
+  }, [lat, lng, heading, instructions]);
 
-  // Every 5s refresh distance from phone to current ad's business for live updates
+  // Every 5s refresh distance and heading-relative direction
   useEffect(() => {
     function tick() {
       const inst = instructions[0];
       if (lat == null || lng == null || inst?.businessLat == null || inst?.businessLng == null) return;
       const m = distanceMeters(lat, lng, inst.businessLat, inst.businessLng);
-      setPlaceholders((p) => ({ ...p, DISTANCE: formatDistance(m) }));
+      const h = useLocationStore.getState().heading;
+      setPlaceholders((p) => ({
+        ...p,
+        DISTANCE: distanceWithDirection(m, lat, lng, inst.businessLat, inst.businessLng, undefined, h),
+      }));
     }
     const id = setInterval(tick, LIVE_DISTANCE_INTERVAL_MS);
     tick();
     return () => clearInterval(id);
   }, [lat, lng, instructions]);
+
+  // Sync the phone's relative direction to the backend so the display URL mirrors it
+  const lastSyncedDir = useRef<string | null>(null);
+  useEffect(() => {
+    function syncDirection() {
+      const inst = instructions[0];
+      const h = useLocationStore.getState().heading;
+      const la = useLocationStore.getState().lat;
+      const ln = useLocationStore.getState().lng;
+      if (h == null || la == null || ln == null || inst?.businessLat == null || inst?.businessLng == null) return;
+      const dir = relativeDirection(la, ln, inst.businessLat, inst.businessLng, h);
+      if (dir === lastSyncedDir.current) return;
+      lastSyncedDir.current = dir;
+      fetch(`${getApiBase()}/ad-selection/direction/${encodeURIComponent(driverId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+        body: JSON.stringify({ direction: dir }),
+      }).catch(() => {});
+    }
+    const id = setInterval(syncDirection, DIRECTION_SYNC_INTERVAL_MS);
+    syncDirection();
+    return () => clearInterval(id);
+  }, [driverId, instructions]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -109,7 +208,7 @@ export default function HomeScreen() {
           <Text style={styles.adSourceHint}>From display (synced)</Text>
         )}
         <View style={styles.slotWrap}>
-          <AdSlot instruction={slot1} placeholders={placeholders} />
+          <AdSlot instruction={slot1} placeholders={placeholders} heading={heading} userLat={lat} userLng={lng} />
         </View>
       </View>
       <View style={styles.card}>

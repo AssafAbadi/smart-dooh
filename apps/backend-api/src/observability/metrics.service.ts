@@ -1,18 +1,16 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { Counter, Histogram, register } from 'prom-client';
+import { Counter, Gauge, Histogram, register } from 'prom-client';
 
-/**
- * Prometheus metrics for Observability (Prompt 6):
- * - ad_selection_latency_seconds
- * - cache_hit_ratio (via cache_hits_total / cache_misses_total)
- * - impressions_per_campaign
- */
 @Injectable()
 export class MetricsService implements OnModuleInit {
   adSelectionLatency: Histogram<string> | null = null;
   cacheHitsTotal: Counter<string> | null = null;
   cacheMissesTotal: Counter<string> | null = null;
   impressionsPerCampaign: Counter<string> | null = null;
+  emergencyAlertsDetected: Counter<string> | null = null;
+  emergencyPushLatency: Histogram<string> | null = null;
+  shelterSelectionDuration: Histogram<string> | null = null;
+  socketConnectionsActive: Gauge<string> | null = null;
 
   onModuleInit(): void {
     this.adSelectionLatency = new Histogram({
@@ -39,6 +37,32 @@ export class MetricsService implements OnModuleInit {
       labelNames: ['campaign_id'],
       registers: [register],
     });
+    this.emergencyAlertsDetected = new Counter({
+      name: 'emergency_alerts_detected_total',
+      help: 'Total Pikud HaOref alerts detected',
+      labelNames: [],
+      registers: [register],
+    });
+    this.emergencyPushLatency = new Histogram({
+      name: 'emergency_push_latency_seconds',
+      help: 'Time from alert detection to socket push',
+      labelNames: [],
+      buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+      registers: [register],
+    });
+    this.shelterSelectionDuration = new Histogram({
+      name: 'shelter_selection_duration_seconds',
+      help: 'Time to select shelter with anti-crowding',
+      labelNames: [],
+      buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5],
+      registers: [register],
+    });
+    this.socketConnectionsActive = new Gauge({
+      name: 'socket_connections_active',
+      help: 'Number of active emergency socket connections',
+      labelNames: [],
+      registers: [register],
+    });
   }
 
   recordAdSelectionLatency(seconds: number): void {
@@ -55,5 +79,21 @@ export class MetricsService implements OnModuleInit {
 
   recordImpression(campaignId: string): void {
     this.impressionsPerCampaign?.inc({ campaign_id: campaignId });
+  }
+
+  recordEmergencyAlertDetected(): void {
+    this.emergencyAlertsDetected?.inc();
+  }
+
+  recordEmergencyPushLatency(seconds: number): void {
+    this.emergencyPushLatency?.observe(seconds);
+  }
+
+  recordShelterSelectionDuration(seconds: number): void {
+    this.shelterSelectionDuration?.observe(seconds);
+  }
+
+  setSocketConnectionsActive(count: number): void {
+    this.socketConnectionsActive?.set(count);
   }
 }

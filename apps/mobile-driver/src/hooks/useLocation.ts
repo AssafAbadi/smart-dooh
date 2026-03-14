@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
-import { requestLocationPermission, startLocationUpdates, startForegroundWatch } from '../services/locationService';
+import { requestLocationPermission, startLocationUpdates, startForegroundWatch, startHeadingWatch } from '../services/locationService';
 import { useLocationStore } from '../stores/locationStore';
 import { useSimulatorStore } from '../stores/simulatorStore';
 
@@ -12,8 +12,10 @@ const USE_FALLBACK_WHEN_DENIED = true; // Set to false to see real error (no pos
 
 function tryRequestPermission(
   setLocation: (lat: number, lng: number, geohash: string, isFallback?: boolean) => void,
+  setHeading: (heading: number) => void,
   cleanupRef: React.MutableRefObject<(() => void) | null>,
   foregroundCleanupRef: React.MutableRefObject<(() => void) | null>,
+  headingCleanupRef: React.MutableRefObject<(() => void) | null>,
   mounted: () => boolean
 ) {
   requestLocationPermission().then((result) => {
@@ -24,6 +26,8 @@ function tryRequestPermission(
     if (granted) {
       const stopForeground = startForegroundWatch(setLocation);
       if (mounted()) foregroundCleanupRef.current = stopForeground;
+      const stopHeading = startHeadingWatch(setHeading);
+      if (mounted()) headingCleanupRef.current = stopHeading;
       startLocationUpdates(setLocation).then((cleanup) => {
         if (mounted()) cleanupRef.current = cleanup;
       });
@@ -48,9 +52,10 @@ function tryRequestPermission(
 
 export function useLocation() {
   const simulatorMode = useSimulatorStore((s) => s.simulatorMode);
-  const { setLocation } = useLocationStore();
+  const { setLocation, setHeading } = useLocationStore();
   const cleanupRef = useRef<(() => void) | null>(null);
   const foregroundCleanupRef = useRef<(() => void) | null>(null);
+  const headingCleanupRef = useRef<(() => void) | null>(null);
   const retryDoneRef = useRef(false);
 
   useEffect(() => {
@@ -65,20 +70,21 @@ export function useLocation() {
       console.log('[useLocation] getForegroundPermissionsAsync() at start:', r.status, JSON.stringify(r));
     }).catch((e) => console.warn('[useLocation] getForegroundPermissionsAsync failed:', e));
 
-    tryRequestPermission(setLocation, cleanupRef, foregroundCleanupRef, () => mounted);
+    tryRequestPermission(setLocation, setHeading, cleanupRef, foregroundCleanupRef, headingCleanupRef, () => mounted);
 
     const retryTimer = setTimeout(() => {
       if (!mounted || retryDoneRef.current) return;
       retryDoneRef.current = true;
       console.log('[useLocation] Retry: checking permission again');
-      tryRequestPermission(setLocation, cleanupRef, foregroundCleanupRef, () => mounted);
+      tryRequestPermission(setLocation, setHeading, cleanupRef, foregroundCleanupRef, headingCleanupRef, () => mounted);
     }, 2500);
 
     return () => {
       mounted = false;
       clearTimeout(retryTimer);
       foregroundCleanupRef.current?.();
+      headingCleanupRef.current?.();
       cleanupRef.current?.();
     };
-  }, [simulatorMode, setLocation]);
+  }, [simulatorMode, setLocation, setHeading]);
 }

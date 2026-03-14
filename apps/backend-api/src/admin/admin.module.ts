@@ -6,9 +6,10 @@ import { AdminAnalyticsRepository } from './repositories/admin-analytics.reposit
 import { AdminCampaignRepository } from './repositories/campaign.repository';
 import { AdminCreativeRepository } from './repositories/creative.repository';
 import { RedemptionRepository } from './repositories/redemption.repository';
+import { AdSelectionModule } from '../ad-selection/ad-selection.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AdSelectionModule],
   controllers: [AdminController],
   providers: [
     AdminService,

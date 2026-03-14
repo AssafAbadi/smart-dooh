@@ -7,6 +7,10 @@ import { MetricsService } from '../observability/metrics.service';
 import { ImpressionEstimatorService } from '../impression-estimator/impression-estimator.service';
 import { CampaignRepository } from '../campaign/repositories/campaign.repository';
 import { DriverRepository } from '../driver/repositories/driver.repository';
+import { CampaignStatsService } from '../ad-selection/services/campaign-stats.service';
+import { FrequencyCapService } from '../ad-selection/services/frequency-cap.service';
+import { BudgetPacingService } from '../ad-selection/services/budget-pacing.service';
+import { ShareOfVoiceService } from '../ad-selection/services/share-of-voice.service';
 
 describe('ImpressionsService', () => {
   let service: ImpressionsService;
@@ -50,6 +54,22 @@ describe('ImpressionsService', () => {
         {
           provide: TimeService,
           useValue: { getIsraelNow: jest.fn().mockReturnValue({ dayOfWeek: 2, hour: 14, minute: 0 }) },
+        },
+        {
+          provide: CampaignStatsService,
+          useValue: { incrementImpressions: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: FrequencyCapService,
+          useValue: { recordImpression: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: BudgetPacingService,
+          useValue: { recordSpend: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: ShareOfVoiceService,
+          useValue: { recordImpression: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

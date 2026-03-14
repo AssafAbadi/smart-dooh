@@ -43,4 +43,8 @@ export class TimeService {
     }
     return { dayOfWeek, hour, minute };
   }
+
+  nowMillis(): number {
+    return Date.now();
+  }
 }

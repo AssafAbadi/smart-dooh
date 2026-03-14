@@ -10,4 +10,11 @@ export const TOKENS = {
   IRateLimitService: Symbol('IRateLimitService'),
   ICarScreenRepository: Symbol('ICarScreenRepository'),
   IEmergencyAlertRepository: Symbol('IEmergencyAlertRepository'),
+  // Shelter module
+  IShelterRepository: Symbol('IShelterRepository'),
+  IGisShelterClient: Symbol('IGisShelterClient'),
+  // Emergency module
+  IAlertStateRepository: Symbol('IAlertStateRepository'),
+  IAlertZoneMatcher: Symbol('IAlertZoneMatcher'),
+  IAlertProviders: Symbol('IAlertProviders'),
 } as const;

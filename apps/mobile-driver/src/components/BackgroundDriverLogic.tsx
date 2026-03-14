@@ -3,11 +3,14 @@ import * as SecureStore from 'expo-secure-store';
 import { useLocationStore } from '../stores/locationStore';
 import { useAdStore } from '../stores/adStore';
 import { useOfflineQueueStore } from '../stores/offlineQueueStore';
+import { useEmergencyStore } from '../stores/emergencyStore';
 import { useLocation } from '../hooks/useLocation';
 import { useSimulatorPosition } from '../hooks/useSimulatorPosition';
 import { useAdaptivePolling, INTERVAL_SIMULATOR_MS } from '../hooks/useAdaptivePolling';
 import { SIMULATOR_DRIVER_ID } from '../stores/simulatorStore';
 import { syncWithBackoff, createImpressionSender } from '../services/impressionSync';
+import { connectSocket, updateSocketPosition, disconnectSocket } from '../services/socketService';
+import { refreshShelterCache } from '../services/shelterCache';
 import { getApiBase, apiHeaders } from '../services/apiClient';
 import { logger } from '../utils/logger';
 
@@ -58,6 +61,26 @@ export function BackgroundDriverLogic() {
     });
     return () => { cancelled = true; };
   }, []);
+
+  // Connect emergency socket once we have a valid position.
+  // Must depend on lat/lng so the effect re-runs when location becomes available.
+  const hasConnectedRef = useRef(false);
+  useEffect(() => {
+    if (hasConnectedRef.current || lat == null || lng == null) return;
+    hasConnectedRef.current = true;
+    const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
+    connectSocket(driverId, lat, lng);
+    return () => {
+      disconnectSocket();
+      hasConnectedRef.current = false;
+    };
+  }, [lat, lng, isSimulated]);
+
+  useEffect(() => {
+    if (lat == null || lng == null) return;
+    updateSocketPosition(lat, lng);
+    refreshShelterCache(lat, lng).catch(() => {});
+  }, [lat, lng]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -120,10 +143,29 @@ export function BackgroundDriverLogic() {
         return r.json().then((data) => ({ res: r, data }));
       })
       .then(({ data }) => {
-        if (data != null && Array.isArray(data.instructions)) {
+        if (data != null && Array.isArray(data.instructions) && data.instructions.length > 0) {
           logger.info('Ranked response', { count: data.instructions.length });
           setInstructions(data.instructions, 'ranked');
           const first = data.instructions[0];
+          if (first?.emergencyData) {
+            const ed = first.emergencyData;
+            useEmergencyStore.getState().setAlert(
+              {
+                address: ed.shelterAddress,
+                lat: ed.shelterLat,
+                lng: ed.shelterLng,
+                distanceMeters: ed.distanceMeters,
+                bearingDegrees: ed.bearingDegrees,
+                direction: ed.direction,
+              },
+              ed.alertHeadline,
+            );
+          } else if (first?.campaignId !== 'emergency') {
+            const emergStore = useEmergencyStore.getState();
+            if (emergStore.isAlertActive && emergStore.alertTimestamp && Date.now() - emergStore.alertTimestamp > 600_000) {
+              emergStore.clearAlert();
+            }
+          }
           const deviceId = deviceIdRef.current ?? `device-${Date.now()}`;
           const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
           if (
@@ -184,16 +226,22 @@ export function BackgroundDriverLogic() {
   }, [refreshTrigger, fetchRanked]);
 
   // Sync with display: poll GET /ad-selection/last/driver-1 so the app shows the same ad as the display URL.
-  // Also enqueue one impression so balance can go up when the user sees this ad.
+  // Only use "last" when ranked hasn't responded recently (e.g. cellular failures) to avoid flip-flopping.
   const driverIdForLast = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
   useEffect(() => {
     const fetchLast = () => {
+      const currentSource = useAdStore.getState().adSource;
+      const timeSinceRanked = Date.now() - lastAdFetchTimeRef.current;
+      if (currentSource === 'ranked' && timeSinceRanked < 30_000) return;
+
       fetch(`${API_BASE}/ad-selection/last/${encodeURIComponent(driverIdForLast)}`, {
         headers: apiHeaders({ Accept: 'application/json' }),
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!data?.instructions?.length) return;
+          const rankedStale = Date.now() - lastAdFetchTimeRef.current > 30_000;
+          if (!rankedStale && useAdStore.getState().adSource === 'ranked') return;
           setInstructions(data.instructions, 'last');
           const first = data.instructions[0];
           if (

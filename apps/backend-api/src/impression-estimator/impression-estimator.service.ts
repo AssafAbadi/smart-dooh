@@ -5,6 +5,8 @@ import { getTimeMultiplier, getSpeedFactor } from './estimation-factors.util';
 import { LiveEventRepository } from './repositories/live-event.repository';
 
 const DEFAULT_BASE_DENSITY = 10;
+/** Visibility factor: share of passers-by who actually see the ad (e.g. 0.2–0.4). Formula: impressions ≈ traffic_density × time_multiplier × speed_factor × visibility_factor × event_boost; speed_factor already encodes dwell_time. */
+const VISIBILITY_FACTOR = parseFloat(process.env['VISIBILITY_FACTOR'] ?? '0.3');
 
 export interface EstimateInput {
   geohash: string;
@@ -53,7 +55,7 @@ export class ImpressionEstimatorService {
     }
 
     const estimatedReach =
-      baseDensity * timeMultiplier * speedFactor * eventTriggerFactor;
+      baseDensity * timeMultiplier * speedFactor * VISIBILITY_FACTOR * eventTriggerFactor;
 
     const result: EstimateResult = {
       estimatedReach,
@@ -70,6 +72,7 @@ export class ImpressionEstimatorService {
       baseDensity,
       timeMultiplier,
       speedFactor,
+      visibilityFactor: VISIBILITY_FACTOR,
       eventTriggerFactor,
       estimatedReach,
     });

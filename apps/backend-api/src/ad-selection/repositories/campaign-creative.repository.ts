@@ -29,6 +29,7 @@ export class CampaignCreativeRepository {
     
     const result: CandidateAd[] = [];
     for (const c of filteredCampaigns) {
+      const dist = lat != null && lng != null ? this.distanceMeters(c.geofence, lat, lng) : null;
       for (const cr of c.creatives) {
         result.push({
           campaignId: c.id,
@@ -41,6 +42,9 @@ export class CampaignCreativeRepository {
           businessId: c.businessId,
           cpm: c.cpm,
           budgetRemaining: c.budgetRemaining,
+          dailyBudget: c.dailyBudget,
+          createdAt: c.createdAt,
+          distanceMeters: dist != null ? Math.round(dist) : undefined,
         });
       }
     }

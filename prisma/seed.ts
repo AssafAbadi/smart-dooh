@@ -39,7 +39,7 @@ async function ensureDriver(prisma: PrismaClient, id: string) {
   });
 }
 
-/** Create one campaign and one creative for a business. Call only after campaigns wipe so businessId is guaranteed correct. */
+/** Create one campaign (with optional dailyBudget) + one creative + initial CampaignStats row. */
 async function createCampaignForBusiness(
   prisma: PrismaClient,
   businessId: string,
@@ -50,13 +50,15 @@ async function createCampaignForBusiness(
   point: { lat: number; lng: number; radiusMeters: number },
   cpm: number,
   budgetRemaining: number,
-  ratePerReach: number = 0.02 // ILS per estimated reach so driver balance updates when impressions are recorded
+  ratePerReach: number = 0.02,
+  dailyBudget: number | null = null,
 ) {
   const campaign = await prisma.campaign.create({
     data: {
       businessId,
       cpm,
       budgetRemaining,
+      dailyBudget,
       ratePerReach,
       active: true,
       geofence: { type: 'circle', lat: point.lat, lng: point.lng, radiusMeters: point.radiusMeters },
@@ -65,7 +67,12 @@ async function createCampaignForBusiness(
   await prisma.creative.create({
     data: { campaignId: campaign.id, headline, body, couponCode, status: 'APPROVED' },
   });
-  console.log(`Campaign+creative seeded for ${businessName}: ${headline} (geofence @ ${point.lat.toFixed(4)},${point.lng.toFixed(4)} r=${point.radiusMeters}m cpm=${cpm})`);
+  await prisma.campaignStats.upsert({
+    where: { campaignId: campaign.id },
+    create: { campaignId: campaign.id },
+    update: {},
+  });
+  console.log(`Campaign+creative seeded for ${businessName}: ${headline} (geofence @ ${point.lat.toFixed(4)},${point.lng.toFixed(4)} r=${point.radiusMeters}m cpm=${cpm} daily=${dailyBudget ?? 'none'})`);
 }
 
 /** 8 points from mock-driver-simulator data/tel-aviv-route.json – geofences spread along route so different ads win at different points. */
@@ -81,7 +88,7 @@ const ROUTE_8_POINTS = [
 ] as const;
 const GEOFENCE_RADIUS_M = 280; // Only one or two campaigns in range per simulator point
 
-/** Real businesses – 100m radius so the ad shown is for the venue you're actually near. */
+/** Real businesses – 100m radius for testing so ads change as you walk (set to 300+ for production). */
 const REAL_BUSINESSES_RADIUS_M = 100;
 const REAL_BUSINESSES = [
   {
@@ -95,6 +102,7 @@ const REAL_BUSINESSES = [
     couponCode: 'NABI20',
     cpm: 300,
     budgetRemaining: 100_000,
+    dailyBudget: 500,
   },
   {
     name: "Chacho's Cafe Geula",
@@ -107,6 +115,7 @@ const REAL_BUSINESSES = [
     couponCode: 'CHACHO15',
     cpm: 420,
     budgetRemaining: 90_000,
+    dailyBudget: 800,
   },
   {
     name: 'Mob Deli',
@@ -119,6 +128,7 @@ const REAL_BUSINESSES = [
     couponCode: 'MOB10',
     cpm: 400,
     budgetRemaining: 80_000,
+    dailyBudget: 600,
   },
   {
     name: "Gogi's Grill Bar",
@@ -131,6 +141,7 @@ const REAL_BUSINESSES = [
     couponCode: 'GOGI15',
     cpm: 430,
     budgetRemaining: 85_000,
+    dailyBudget: 700,
   },
   {
     name: 'Norish Cafe',
@@ -143,6 +154,7 @@ const REAL_BUSINESSES = [
     couponCode: 'NORISH10',
     cpm: 400,
     budgetRemaining: 75_000,
+    dailyBudget: 500,
   },
   {
     name: 'Bar 51',
@@ -155,6 +167,7 @@ const REAL_BUSINESSES = [
     couponCode: 'BAR51',
     cpm: 440,
     budgetRemaining: 80_000,
+    dailyBudget: 750,
   },
   {
     name: 'U.S. Embassy Branch Office Tel Aviv',
@@ -167,6 +180,7 @@ const REAL_BUSINESSES = [
     couponCode: '—',
     cpm: 350,
     budgetRemaining: 50_000,
+    dailyBudget: 400,
   },
   {
     name: 'Rambam Shawarma',
@@ -179,6 +193,60 @@ const REAL_BUSINESSES = [
     couponCode: 'RAMBAM10',
     cpm: 420,
     budgetRemaining: 70_000,
+    dailyBudget: 600,
+  },
+  {
+    name: 'Silly Kid',
+    language: 'he',
+    tags: [BusinessTag.RESTAURANT] as BusinessTagType[],
+    lat: 32.0725,
+    lng: 34.7692,
+    headline: 'Silly Kid – 15% off with [COUPON_CODE]',
+    body: 'Yona Hanavi St, Tel Aviv. No alcohol, unkosher. [DISTANCE] away.',
+    couponCode: 'SILLY15',
+    cpm: 380,
+    budgetRemaining: 60_000,
+    dailyBudget: 450,
+  },
+  // Pinsker / central TA – 100m radius so ads change as you walk
+  {
+    name: 'A.K.A Bar',
+    language: 'he',
+    tags: [BusinessTag.RESTAURANT, BusinessTag.SERVES_ALCOHOL] as BusinessTagType[],
+    lat: 32.0668,
+    lng: 34.7695,
+    headline: 'A.K.A Bar – [COUPON_CODE] on your next drink',
+    body: 'Pinsker 16 area, Tel Aviv. [DISTANCE] away.',
+    couponCode: 'AKA10',
+    cpm: 400,
+    budgetRemaining: 80_000,
+    dailyBudget: 500,
+  },
+  {
+    name: 'Emesh',
+    language: 'he',
+    tags: [BusinessTag.RESTAURANT, BusinessTag.SERVES_ALCOHOL] as BusinessTagType[],
+    lat: 32.0675,
+    lng: 34.7702,
+    headline: 'Emesh – [COUPON_CODE]',
+    body: 'Near Pinsker, Tel Aviv. [DISTANCE] away.',
+    couponCode: 'EMESH15',
+    cpm: 380,
+    budgetRemaining: 70_000,
+    dailyBudget: 450,
+  },
+  {
+    name: 'Riverano Gelato',
+    language: 'he',
+    tags: [BusinessTag.RESTAURANT] as BusinessTagType[],
+    lat: 32.0662,
+    lng: 34.7689,
+    headline: 'Riverano Gelato – [COUPON_CODE] off',
+    body: 'Tel Aviv. [DISTANCE] away.',
+    couponCode: 'GELATO10',
+    cpm: 350,
+    budgetRemaining: 60_000,
+    dailyBudget: 400,
   },
 ] as const;
 
@@ -259,9 +327,10 @@ async function main() {
     realBusinesses.push({ id: biz.id, name: biz.name });
   }
 
-  // --- 2) Wipe all campaigns (creatives cascade) so we can recreate with correct businessId ---
+  // --- 2) Wipe all campaigns (creatives + stats cascade) so we can recreate with correct businessId ---
+  await prisma.campaignStats.deleteMany({});
   const deleted = await prisma.campaign.deleteMany({});
-  console.log(`Deleted ${deleted.count} campaign(s) (creatives cascaded).`);
+  console.log(`Deleted ${deleted.count} campaign(s) (creatives + stats cascaded).`);
 
   // --- 3) Create exactly one campaign + one creative per business; geofences spread along 8-point route so ad changes as simulator moves ---
   await createCampaignForBusiness(
@@ -309,7 +378,7 @@ async function main() {
     70_000
   );
 
-  // --- 3b) Campaigns for real businesses (300m radius) ---
+  // --- 3b) Campaigns for real businesses ---
   for (let i = 0; i < REAL_BUSINESSES.length; i++) {
     const b = REAL_BUSINESSES[i];
     const { id } = realBusinesses[i];
@@ -322,7 +391,9 @@ async function main() {
       b.couponCode,
       { lat: b.lat, lng: b.lng, radiusMeters: REAL_BUSINESSES_RADIUS_M },
       b.cpm,
-      b.budgetRemaining
+      b.budgetRemaining,
+      0.02,
+      b.dailyBudget ?? null,
     );
   }
 

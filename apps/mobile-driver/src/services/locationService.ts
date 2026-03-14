@@ -75,6 +75,30 @@ export function startForegroundWatch(
   };
 }
 
+/** Watch compass heading so direction arrows follow the phone's orientation. */
+export function startHeadingWatch(
+  setHeading: (heading: number) => void
+): () => void {
+  let subscription: { remove: () => void } | null = null;
+  Location.watchHeadingAsync((headingData) => {
+    if (headingData.trueHeading >= 0) {
+      setHeading(headingData.trueHeading);
+    } else if (headingData.magHeading >= 0) {
+      setHeading(headingData.magHeading);
+    }
+  })
+    .then((sub) => {
+      subscription = sub;
+    })
+    .catch((e) => {
+      console.warn('[locationService] watchHeadingAsync failed', (e as Error)?.message ?? e);
+    });
+  return () => {
+    subscription?.remove();
+    subscription = null;
+  };
+}
+
 export async function startLocationUpdates(
   _setLocation: (lat: number, lng: number, geohash: string) => void
 ): Promise<() => void> {

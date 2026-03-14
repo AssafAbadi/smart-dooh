@@ -16,6 +16,7 @@ import { PlacesApiService } from '../external-api/places-api.service';
 import { WeatherApiService } from '../external-api/weather-api.service';
 
 const LAST_POSITION_KEY_PREFIX = 'context:last_position:';
+const DISPLAY_LAST_KEY_PREFIX = 'display:last:';
 const MOVE_THRESHOLD_METERS = 100;
 
 export interface ContextWithIntegrationsResult {
@@ -57,6 +58,12 @@ export class ContextEngineService {
   ): Promise<DriverPreferencesRecord> {
     this.logger.log({ driverId, body: update, msg: 'updateDriverPreferences' });
     const prefs = await this.driverPrefsRepo.upsert(driverId, update);
+    const client = this.redis.getClient() as Redis | null;
+    if (client) {
+      const key = `${DISPLAY_LAST_KEY_PREFIX}${driverId}`;
+      await client.del(key);
+      this.logger.log({ driverId, msg: 'display cache invalidated after preferences update' });
+    }
     return prefs;
   }
 

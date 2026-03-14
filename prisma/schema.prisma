@@ -88,20 +88,27 @@ model EmergencyAlert {
   radiusMeters  Int      @default(500)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([active])
 }
 
 model Campaign {
-  id               String    @id @default(uuid())
+  id               String          @id @default(uuid())
   businessId       String
-  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  cpm              Int       // cents or basis
-  budgetRemaining  Int       // remaining budget units
-  ratePerReach     Float?    // ILS per estimated reach (for driver revenue)
-  active           Boolean   @default(true)
-  geofence         Json?     // { type: 'circle', lat, lng, radiusMeters } or { type: 'polygon', coordinates: [[lng,lat],...] }
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  business         Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  cpm              Int             // cents or basis
+  budgetRemaining  Int             // remaining budget units
+  dailyBudget      Float?          // optional daily budget for pacing (null = no pacing limit)
+  ratePerReach     Float?          // ILS per estimated reach (for driver revenue)
+  active           Boolean         @default(true)
+  geofence         Json?           // { type: 'circle', lat, lng, radiusMeters } or { type: 'polygon', coordinates: [[lng,lat],...] }
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   creatives        Creative[]
+  stats            CampaignStats?
+
+  @@index([active])
+  @@index([businessId])
 }
 
 model Creative {
@@ -117,6 +124,8 @@ model Creative {
   trendContext String?       // optional: trend headline that inspired this creative
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+
+  @@index([campaignId])
 }
 
 enum CreativeStatus {
@@ -126,16 +135,34 @@ enum CreativeStatus {
 }
 
 model Impression {
-  id         String   @id @default(uuid())
-  clientUuid String   @unique(map: "impression_client_uuid_key")
-  campaignId String
-  creativeId String
-  deviceId   String
-  driverId   String?
-  lat        Float
-  lng        Float
-  geohash    String
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid())
+  clientUuid   String   @unique(map: "impression_client_uuid_key")
+  campaignId   String
+  creativeId   String
+  deviceId     String
+  driverId     String?
+  lat          Float
+  lng          Float
+  geohash      String
+  effectiveCpm Float?   // second-price auction: what the winner actually pays
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, deviceId, driverId])
+  @@index([geohash])
+}
+
+/// Per-campaign performance stats for quality score and pacing.
+model CampaignStats {
+  id              String   @id @default(uuid())
+  campaignId      String   @unique
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  impressionCount Int      @default(0)
+  redemptionCount Int      @default(0)
+  ctr             Float    @default(0) // redemptionCount / impressionCount
+  revenue         Float    @default(0) // total spend by this campaign
+  lastComputedAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Redemption {
@@ -145,6 +172,8 @@ model Redemption {
   creativeId  String
   couponCode  String?
   redeemedAt DateTime @default(now())
+
+  @@index([campaignId])
 }
 
 model Payment {
@@ -183,14 +212,21 @@ model DriverEarnings {
 }
 
 model Payout {
-  id          String   @id @default(uuid())
+  id          String        @id @default(uuid())
   driverId    String
   amountILS   Float
-  bankDetails Json?    // { accountNumber, bankCode, branchCode } for Israeli banks
-  status      String   @default("pending") // pending, processing, completed, failed
+  bankDetails Json?         // { accountNumber, bankCode, branchCode } for Israeli banks
+  status      PayoutStatus  @default(PENDING)
   processedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 /// Traffic density by location and time (geohash level 7). Used by ImpressionEstimatorService.
@@ -207,6 +243,20 @@ model TrafficDensity {
   @@index([geohash, dayOfWeek, hour])
 }
 
+/// Public shelters synced from Tel Aviv municipality GIS for emergency navigation.
+model Shelter {
+  id          String   @id @default(uuid())
+  externalId  String   @unique
+  address     String
+  lat         Float
+  lng         Float
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([lat, lng])
+}
+
 /// Live events (e.g. Bloomfield Stadium) for location-based reach boost.
 model LiveEvent {
   id          String   @id @default(uuid())
@@ -218,4 +268,6 @@ model LiveEvent {
   expiresAt   DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([expiresAt, lat, lng])
 }

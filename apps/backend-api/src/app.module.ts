@@ -22,6 +22,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { SimulatorModule } from './simulator/simulator.module';
 import { DisplayModule } from './display/display.module';
 import { DriverModule } from './driver/driver.module';
+import { ShelterModule } from './shelter/shelter.module';
+import { EmergencyModule } from './emergency/emergency.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { DriverModule } from './driver/driver.module';
     SimulatorModule,
     DisplayModule,
     DriverModule,
+    ShelterModule,
+    EmergencyModule,
   ],
 })
 export class AppModule {}

@@ -91,3 +91,9 @@ export {
   stripePaymentIntentSucceededEventSchema,
   type StripePaymentIntentSucceededEvent,
 } from './webhooks.dto';
+export {
+  emergencyDataSchema,
+  emergencyCheckResultSchema,
+  type EmergencyData,
+  type EmergencyCheckResult,
+} from './emergency.dto';

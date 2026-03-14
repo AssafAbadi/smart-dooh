@@ -12,6 +12,8 @@ module.exports = function (api) {
           alias: {
             '@smart-dooh/shared-dto': '../../libs/shared/dto/src/index.ts',
             '@smart-dooh/shared-dto/*': '../../libs/shared/dto/src/*',
+            '@smart-dooh/shared-geo': '../../libs/shared/geo/src/index.ts',
+            '@smart-dooh/shared-geo/*': '../../libs/shared/geo/src/*',
             '@smart-dooh/shared-sdk': '../../libs/shared/sdk/src/index.ts',
             '@smart-dooh/shared-sdk/*': '../../libs/shared/sdk/src/*',
           },

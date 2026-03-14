@@ -2,6 +2,7 @@
  * AdSelectionEngine: Strategy pattern chain.
  * Input and candidate type for ranking; output is AdInstruction[].
  */
+import type { EmergencyData } from '../../emergency/interfaces/emergency.interface';
 
 export interface CandidateAd {
   campaignId: string;
@@ -14,7 +15,16 @@ export interface CandidateAd {
   businessId: string;
   cpm: number;
   budgetRemaining: number;
+  dailyBudget?: number | null;
+  createdAt?: Date;
   priority?: number;
+  distanceMeters?: number;
+  adRank?: number;
+  qualityScore?: number;
+  relevanceScore?: number;
+  pacingFactor?: number;
+  sovPenalty?: number;
+  effectiveCpm?: number;
 }
 
 export interface SelectionContext {
@@ -52,6 +62,15 @@ export interface AdInstructionResult {
   /** Geofence center so the app can compute distance client-side for live updates. */
   businessLat?: number;
   businessLng?: number;
+  /** Direction from user to business for arrow: up (N), right (E), down (S), left (W). */
+  direction?: 'up' | 'down' | 'left' | 'right';
+  effectiveCpm?: number;
+  adRank?: number;
+  qualityScore?: number;
+  relevanceScore?: number;
+  pacingFactor?: number;
+  sovPenalty?: number;
+  emergencyData?: EmergencyData;
 }
 
 /**

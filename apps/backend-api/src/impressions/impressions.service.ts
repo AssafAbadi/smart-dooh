@@ -9,6 +9,10 @@ import type { RecordImpressionInput } from './repositories/impressions.repositor
 import { ImpressionEstimatorService } from '../impression-estimator/impression-estimator.service';
 import { CampaignRepository } from '../campaign/repositories/campaign.repository';
 import { DriverRepository } from '../driver/repositories/driver.repository';
+import { CampaignStatsService } from '../ad-selection/services/campaign-stats.service';
+import { FrequencyCapService } from '../ad-selection/services/frequency-cap.service';
+import { BudgetPacingService } from '../ad-selection/services/budget-pacing.service';
+import { ShareOfVoiceService } from '../ad-selection/services/share-of-voice.service';
 
 const THROTTLE_TTL_SEC = 15;
 const THROTTLE_KEY_PREFIX = 'throttle:';
@@ -25,6 +29,10 @@ export class ImpressionsService {
     private readonly driverRepo: DriverRepository,
     private readonly time: TimeService,
     @Inject(TOKENS.IRedisService) private readonly redis: IRedisService,
+    private readonly campaignStats: CampaignStatsService,
+    private readonly frequencyCap: FrequencyCapService,
+    private readonly budgetPacing: BudgetPacingService,
+    private readonly shareOfVoice: ShareOfVoiceService,
   ) {}
 
   async recordIdempotent(input: RecordImpressionInput): Promise<void> {
@@ -39,6 +47,17 @@ export class ImpressionsService {
 
     await this.repo.upsertByClientUuid(input);
     this.metrics.recordImpression(input.campaignId);
+
+    // Track stats, frequency caps, pacing, and SOV in parallel (fire-and-forget for non-critical)
+    const geohash5 = (input.geohash ?? '').substring(0, 5) || 'unk';
+    const effectiveCpm = input.effectiveCpm;
+    const sovBusinessId = input.businessId ?? input.campaignId;
+    await Promise.all([
+      this.campaignStats.incrementImpressions(input.campaignId, effectiveCpm).catch(() => {}),
+      this.frequencyCap.recordImpression(input.campaignId, input.deviceId, geohash5).catch(() => {}),
+      this.budgetPacing.recordSpend(input.campaignId, effectiveCpm ?? 0).catch(() => {}),
+      this.shareOfVoice.recordImpression(sovBusinessId, geohash5).catch(() => {}),
+    ]);
 
     const israel = this.time.getIsraelNow();
     const estimateResult = await this.estimator.estimate({

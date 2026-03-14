@@ -98,7 +98,7 @@ export class PaymentsRepository extends BaseRepository<Payment> {
 
   async findPayoutsByStatus(status: string): Promise<Payout[]> {
     return this.prisma.payout.findMany({
-      where: { status },
+      where: { status: status as any },
       orderBy: { createdAt: 'asc' },
     });
   }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { emergencyDataSchema } from './emergency.dto';
 
 export const adInstructionSchema = z.object({
   campaignId: z.string(),
@@ -14,6 +15,9 @@ export const adInstructionSchema = z.object({
   distanceMeters: z.number().optional(),
   businessLat: z.number().optional(),
   businessLng: z.number().optional(),
+  /** Direction from user to business for arrow: up (N), right (E), down (S), left (W). */
+  direction: z.enum(['up', 'down', 'left', 'right']).optional(),
+  emergencyData: emergencyDataSchema.optional(),
 });
 
 export type AdInstruction = z.infer<typeof adInstructionSchema>;

@@ -7,6 +7,10 @@ import { ImpressionEstimatorService } from '../impression-estimator/impression-e
 import { CampaignRepository } from '../campaign/repositories/campaign.repository';
 import { DriverRepository } from '../driver/repositories/driver.repository';
 import { TimeService } from '../core/time/time.service';
+import { CampaignStatsService } from '../ad-selection/services/campaign-stats.service';
+import { FrequencyCapService } from '../ad-selection/services/frequency-cap.service';
+import { BudgetPacingService } from '../ad-selection/services/budget-pacing.service';
+import { ShareOfVoiceService } from '../ad-selection/services/share-of-voice.service';
 
 describe('ImpressionsService frequency capping', () => {
   let service: ImpressionsService;
@@ -47,6 +51,10 @@ describe('ImpressionsService frequency capping', () => {
           provide: TOKENS.IRedisService,
           useValue: { getClient: () => redisClient },
         },
+        { provide: CampaignStatsService, useValue: { incrementImpressions: jest.fn().mockResolvedValue(undefined) } },
+        { provide: FrequencyCapService, useValue: { recordImpression: jest.fn().mockResolvedValue(undefined) } },
+        { provide: BudgetPacingService, useValue: { recordSpend: jest.fn().mockResolvedValue(undefined) } },
+        { provide: ShareOfVoiceService, useValue: { recordImpression: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

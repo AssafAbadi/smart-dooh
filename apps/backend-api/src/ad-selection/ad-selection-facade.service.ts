@@ -10,6 +10,8 @@ import { AdSelectionEngineService } from './ad-selection-engine.service';
 import { ContextEngineService } from '../context-engine/context-engine.service';
 import { CampaignCreativeRepository } from './repositories/campaign-creative.repository';
 import { MetricsService } from '../observability/metrics.service';
+import { FraudGuardService } from '../fraud-guard/fraud-guard.service';
+import { bearingDegrees, bearingToDirection } from '../external-api/utils/distance';
 
 function hasNoAlcohol(preference_tags: string[] | undefined): boolean {
   return Array.isArray(preference_tags) && preference_tags.includes('NO_ALCOHOL');
@@ -30,6 +32,7 @@ export class AdSelectionFacade {
     private readonly metrics: MetricsService,
     private readonly time: TimeService,
     private readonly weatherApi: WeatherApiService,
+    private readonly fraudGuard: FraudGuardService,
   ) {}
 
   /** Billboard/display mode: ranked ads for driverId. Default = first seeded route point (inside Tel Aviv Café geofence). */
@@ -89,11 +92,18 @@ export class AdSelectionFacade {
     const distanceByBusinessId = new Map(distances.map((d) => [d.businessId, d]));
     instructions = instructions.map((i) => {
       const dist = i.businessId ? distanceByBusinessId.get(i.businessId) : undefined;
+      const businessLat = dist?.lat;
+      const businessLng = dist?.lng;
+      let direction: 'up' | 'down' | 'left' | 'right' | undefined;
+      if (lat != null && lng != null && businessLat != null && businessLng != null) {
+        direction = bearingToDirection(bearingDegrees(lat, lng, businessLat, businessLng));
+      }
       return {
         ...i,
         distanceMeters: dist?.distanceMeters,
-        businessLat: dist?.lat,
-        businessLng: dist?.lng,
+        businessLat,
+        businessLng,
+        direction,
       };
     });
     this.logger.log({
@@ -113,6 +123,12 @@ export class AdSelectionFacade {
           name: i.businessId ? businessNameById.get(i.businessId) ?? i.businessId : '(emergency)',
           businessId: i.businessId,
           priority: i.priority,
+          adRank: i.adRank,
+          qualityScore: i.qualityScore,
+          relevanceScore: i.relevanceScore,
+          pacingFactor: i.pacingFactor,
+          sovPenalty: i.sovPenalty,
+          effectiveCpm: i.effectiveCpm,
           distanceMeters: dist?.distanceMeters,
           radiusMeters: dist?.radiusMeters,
           inRange: dist?.inRange,
@@ -272,6 +288,21 @@ export class AdSelectionFacade {
   }
 
   private async runEngineAndRecordLatency(input: SelectionInput): Promise<AdInstructionResult[]> {
+    const fraudVerdict = await this.fraudGuard.evaluate({
+      driverId: input.driverId,
+      lat: input.lat,
+      lng: input.lng,
+      geohash: input.geohash,
+      deviceId: input.driverId,
+      timestamp: Date.now(),
+    });
+    if (fraudVerdict.isFraud && fraudVerdict.severity === 'block') {
+      this.logger.warn({ driverId: input.driverId, reason: fraudVerdict.reason, msg: 'FraudGuard blocked ad selection' });
+      return [];
+    }
+    if (fraudVerdict.isFraud) {
+      this.logger.warn({ driverId: input.driverId, reason: fraudVerdict.reason, msg: 'FraudGuard flagged request' });
+    }
     const start = performance.now();
     const instructions = await this.engine.select(input);
     this.metrics.recordAdSelectionLatency((performance.now() - start) / 1000);

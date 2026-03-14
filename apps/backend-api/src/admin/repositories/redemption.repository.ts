@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CampaignStatsService } from '../../ad-selection/services/campaign-stats.service';
 
 export interface CreateRedemptionData {
   campaignId: string;
@@ -10,14 +11,19 @@ export interface CreateRedemptionData {
 
 @Injectable()
 export class RedemptionRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(RedemptionRepository.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly campaignStats: CampaignStatsService,
+  ) {}
 
   async count(): Promise<number> {
     return this.prisma.redemption.count();
   }
 
-  create(data: CreateRedemptionData) {
-    return this.prisma.redemption.create({
+  async create(data: CreateRedemptionData) {
+    const result = await this.prisma.redemption.create({
       data: {
         campaignId: data.campaignId,
         creativeId: data.creativeId,
@@ -25,5 +31,9 @@ export class RedemptionRepository {
         impressionId: data.impressionId,
       },
     });
+    await this.campaignStats.incrementRedemptions(data.campaignId).catch((err) => {
+      this.logger.warn({ campaignId: data.campaignId, err: err?.message, msg: 'Failed to increment redemption stats' });
+    });
+    return result;
   }
 }

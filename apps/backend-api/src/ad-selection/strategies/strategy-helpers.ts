@@ -13,5 +13,11 @@ export function candidateToInstruction(c: CandidateAd, placeholders?: Record<str
     ttlSeconds: 60,
     priority: c.priority,
     businessId: c.businessId,
+    effectiveCpm: c.effectiveCpm,
+    adRank: c.adRank,
+    qualityScore: c.qualityScore,
+    relevanceScore: c.relevanceScore,
+    pacingFactor: c.pacingFactor,
+    sovPenalty: c.sovPenalty,
   };
 }

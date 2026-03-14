@@ -36,7 +36,7 @@ describe('ImpressionEstimatorService', () => {
       expect(result.timeMultiplier).toBe(1.6);
       expect(result.speedFactor).toBe(1.0);
       expect(result.eventTriggerFactor).toBe(1.0);
-      expect(result.estimatedReach).toBe(90 * 1.6 * 1.0 * 1.0);
+      expect(result.estimatedReach).toBe(90 * 1.6 * 1.0 * 0.3 * 1.0);
     });
 
     it('should use default baseDensity when repo returns null', async () => {
@@ -48,7 +48,7 @@ describe('ImpressionEstimatorService', () => {
       });
       expect(result.baseDensity).toBe(10);
       expect(result.timeMultiplier).toBe(1.0);
-      expect(result.estimatedReach).toBe(10);
+      expect(result.estimatedReach).toBe(10 * 0.3);
     });
 
     it('should apply speed factor 0.1 when speed > 70 km/h', async () => {
@@ -60,7 +60,7 @@ describe('ImpressionEstimatorService', () => {
         speedKmh: 71,
       });
       expect(result.speedFactor).toBe(0.1);
-      expect(result.estimatedReach).toBe(50 * 1.0 * 0.1 * 1.0);
+      expect(result.estimatedReach).toBe(50 * 1.0 * 0.1 * 0.3 * 1.0);
     });
 
     it('should apply speed factor 2.0 when speed 0 and dwell > 10s', async () => {
@@ -73,7 +73,7 @@ describe('ImpressionEstimatorService', () => {
         dwellSeconds: 15,
       });
       expect(result.speedFactor).toBe(2.0);
-      expect(result.estimatedReach).toBe(20 * 1.0 * 2.0 * 1.0);
+      expect(result.estimatedReach).toBe(20 * 1.0 * 2.0 * 0.3 * 1.0);
     });
 
     it('should use time multiplier 1.4 for Sun–Thu 07 or 08', async () => {
@@ -84,7 +84,7 @@ describe('ImpressionEstimatorService', () => {
         hour: 7,
       });
       expect(result.timeMultiplier).toBe(1.4);
-      expect(result.estimatedReach).toBe(40 * 1.4);
+      expect(result.estimatedReach).toBe(40 * 1.4 * 0.3);
     });
   });
 });

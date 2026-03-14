@@ -24,7 +24,7 @@ export function getDisplayHtml(driverId: string): string {
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: clamp(0.75rem, 3vw, 2rem);
+      padding: clamp(0.5rem, 2vw, 1rem);
       overflow-y: auto;
       overflow-x: hidden;
       min-height: 100vh;
@@ -36,25 +36,35 @@ export function getDisplayHtml(driverId: string): string {
       padding: 0 4vw;
       word-wrap: break-word;
       overflow-wrap: anywhere;
+      flex-shrink: 0;
     }
     .headline {
       color: #fff;
       font-size: clamp(2.2rem, 7vw, 4.5rem);
       font-weight: 700;
       line-height: 1.15;
-      margin-bottom: 0.6em;
+      margin-bottom: 0.2em;
       text-shadow: 0 0 20px rgba(255,255,255,0.2);
     }
     .body {
       color: #e0e0e0;
       font-size: clamp(1.2rem, 3.5vw, 2.3rem);
-      line-height: 1.5;
+      line-height: 1.4;
+      margin-bottom: 0.15em;
+    }
+    .direction-arrow {
+      color: #0af;
+      font-size: clamp(7.5rem, 24vw, 13.5rem);
+      font-weight: 700;
+      line-height: 1;
+      margin: 0.05em 0;
+      text-shadow: 0 0 24px rgba(0,170,255,0.5);
     }
     .coupon {
       color: #fff;
       font-size: clamp(1.6rem, 4.5vw, 3rem);
       font-weight: 700;
-      margin-top: 0.8em;
+      margin-top: 0.2em;
     }
     .slot.fade-enter { animation: fadeIn 0.8s ease-out forwards; }
     .slot.fade-exit { animation: fadeOut 0.5s ease-in forwards; }
@@ -87,11 +97,13 @@ export function getDisplayHtml(driverId: string): string {
       return div.innerHTML;
     }
 
-    function replacePlaceholders(text, instruction) {
+    var DIRECTION_ARROWS = { up: '↑', down: '↓', left: '←', right: '→' };
+    function replacePlaceholders(text, instruction, distanceInBody) {
       if (!text) return '';
-      var dist = (instruction.distanceMeters != null) ? (Math.round(instruction.distanceMeters) + 'm') : '—';
+      var distNum = (instruction.distanceMeters != null) ? (Math.round(instruction.distanceMeters) + 'm') : '—';
+      var distForBody = distanceInBody ? distNum : '—';
       var code = instruction.couponCode || '—';
-      return text.split('[DISTANCE]').join(dist).split('[TIME_LEFT]').join('—').split('[COUPON_CODE]').join(code);
+      return text.split('[DISTANCE]').join(distForBody).split('[TIME_LEFT]').join('—').split('[COUPON_CODE]').join(code);
     }
     function render(instruction, useFade) {
       if (!instruction) {
@@ -99,17 +111,19 @@ export function getDisplayHtml(driverId: string): string {
         lastAdKey = '';
         return;
       }
-      const headlineRaw = replacePlaceholders(instruction.headline || 'Special offer', instruction);
-      const bodyRaw = replacePlaceholders(instruction.body || '', instruction);
+      const headlineRaw = replacePlaceholders(instruction.headline || 'Special offer', instruction, false);
+      const bodyRaw = replacePlaceholders(instruction.body || '', instruction, true);
       const headline = escapeHtml(headlineRaw);
       const bodyEscaped = escapeHtml(bodyRaw);
       const coupon = escapeHtml(instruction.couponCode || '');
+      var arrowChar = instruction.direction && DIRECTION_ARROWS[instruction.direction] ? DIRECTION_ARROWS[instruction.direction] : '';
+      var arrowBlock = arrowChar ? '<div class="direction-arrow">' + escapeHtml(arrowChar) + '</div>' : '';
       if (useFade) {
         root.classList.remove('fade-enter');
         root.offsetHeight;
         root.classList.add('fade-enter');
       }
-      root.innerHTML = '<div class="headline">' + headline + '</div><div class="body">' + bodyEscaped + '</div>' + (coupon ? '<div class="coupon">' + coupon + '</div>' : '');
+      root.innerHTML = '<div class="headline">' + headline + '</div><div class="body">' + bodyEscaped + '</div>' + arrowBlock + (coupon ? '<div class="coupon">' + coupon + '</div>' : '');
     }
 
     function fetchAds() {

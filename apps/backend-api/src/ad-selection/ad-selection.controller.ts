@@ -7,10 +7,13 @@ import type { IRedisService } from '../core/interfaces/redis.interface';
 import { ZodValidationPipe } from '../core/pipes/zod-validation.pipe';
 import { DeviceRateLimitGuard } from '../rate-limit/guards/device-rate-limit.guard';
 import { AdSelectionFacade } from './ad-selection-facade.service';
+import { AdInstructionMapper } from './mappers/ad-instruction.mapper';
 
 const DISPLAY_LAST_KEY_PREFIX = 'display:last:';
-/** 5 min so display and app keep showing last ad when on cellular and ranked requests occasionally fail (e.g. ngrok). */
-const DISPLAY_LAST_TTL_SEC = 300;
+const DISPLAY_DIRECTION_KEY_PREFIX = 'display:direction:';
+const DISPLAY_DIRECTION_TTL_SEC = 30;
+/** 10 min so display and app keep showing last ad when on cellular and ranked requests occasionally fail (e.g. ngrok). */
+const DISPLAY_LAST_TTL_SEC = 600;
 
 /**
  * AdSelection API: returns ranked AdInstruction[].
@@ -25,6 +28,7 @@ export class AdSelectionController {
 
   constructor(
     private readonly facade: AdSelectionFacade,
+    private readonly mapper: AdInstructionMapper,
     @Inject(TOKENS.IRedisService) private readonly redis: IRedisService,
   ) {}
 
@@ -32,11 +36,13 @@ export class AdSelectionController {
   @ApiOperation({ summary: 'Get ranked ad instructions by driver and location' })
   async getRanked(
     @Query(new ZodValidationPipe(rankedQuerySchema)) query: RankedQueryDto,
+    @Query('debug') debug?: string,
   ) {
     const result = await this.facade.getRanked(query);
     if ((result.instructions?.length ?? 0) > 0) await this.cacheLastForDisplay(query.driverId, result);
     this.logger.log({ driverId: query.driverId, instructionsCount: result.instructions?.length ?? 0, msg: 'GET ranked' });
-    return result;
+    if (debug === '1') return result;
+    return { instructions: this.mapper.toPublicList(result.instructions) };
   }
 
   @Get('ranked/:driverId')
@@ -64,8 +70,12 @@ export class AdSelectionController {
       return { instructions: [] };
     }
     try {
-      const data = JSON.parse(raw) as { instructions: unknown[] };
+      const data = JSON.parse(raw) as { instructions: Array<{ direction?: string; businessLat?: number; businessLng?: number; [k: string]: unknown }> };
       this.logger.log({ driverId, instructionsCount: data.instructions?.length ?? 0, msg: 'Display last: cache hit' });
+      const phoneDir = await client.get(`${DISPLAY_DIRECTION_KEY_PREFIX}${driverId}`);
+      if (phoneDir && data.instructions?.length) {
+        data.instructions = data.instructions.map((inst) => ({ ...inst, direction: phoneDir }));
+      }
       return data;
     } catch {
       return { instructions: [] };
@@ -81,6 +91,22 @@ export class AdSelectionController {
     const key = `${DISPLAY_LAST_KEY_PREFIX}${driverId}`;
     await client.setex(key, DISPLAY_LAST_TTL_SEC, JSON.stringify(result));
     this.logger.log({ driverId, instructionsCount: result.instructions?.length ?? 0, msg: 'Cached last for display' });
+  }
+
+  @Post('direction/:driverId')
+  @ApiOperation({ summary: 'Phone sends current relative arrow direction for display sync' })
+  @ApiParam({ name: 'driverId', example: 'driver-1' })
+  async postDirection(
+    @Param('driverId') driverId: string,
+    @Body() body: { direction: string },
+  ) {
+    const valid = ['up', 'down', 'left', 'right'];
+    const dir = body?.direction;
+    if (!dir || !valid.includes(dir)) return { ok: false };
+    const client = this.redis.getClient() as { setex(key: string, ttl: number, value: string): Promise<unknown> } | null;
+    if (!client) return { ok: false };
+    await client.setex(`${DISPLAY_DIRECTION_KEY_PREFIX}${driverId}`, DISPLAY_DIRECTION_TTL_SEC, dir);
+    return { ok: true };
   }
 
   @Post('select')

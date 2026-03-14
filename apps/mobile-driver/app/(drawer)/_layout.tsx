@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { useMenuStore } from '../../src/stores/menuStore';
 import { BackgroundDriverLogic } from '../../src/components/BackgroundDriverLogic';
 import { DrawerMenu } from '../../src/components/DrawerMenu';
+import { EmergencyOverlay } from '../../src/components/EmergencyOverlay';
 import { colors } from '../../src/theme/colors';
 
 const TITLES: Record<string, string> = {
@@ -22,6 +23,7 @@ export default function DrawerLayout() {
     <>
       <BackgroundDriverLogic />
       <DrawerMenu />
+      <EmergencyOverlay />
       <Stack
         screenOptions={{
           headerShown: true,

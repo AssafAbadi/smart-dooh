@@ -8,6 +8,8 @@ export interface RecordImpressionInput {
   creativeId: string;
   deviceId: string;
   driverId?: string;
+  businessId?: string;
+  effectiveCpm?: number;
   lat: number;
   lng: number;
   geohash: string;

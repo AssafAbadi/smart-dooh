@@ -19,6 +19,10 @@ export const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   SKIP_EMERGENCY_FOR_TESTING: z.string().optional(),
+  PIKUD_HAOREF_POLL_INTERVAL_MS: z.string().optional(),
+  EMERGENCY_MODULE_ENABLED: z.string().optional(),
+  EMERGENCY_SHOW_ALL_ISRAEL_ALERTS: z.string().optional(),
+  SHELTER_SEARCH_RADIUS_M: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
