@@ -88,8 +88,8 @@ const ROUTE_8_POINTS = [
 ] as const;
 const GEOFENCE_RADIUS_M = 280; // Only one or two campaigns in range per simulator point
 
-/** Real businesses – 100m radius for testing so ads change as you walk (set to 300+ for production). */
-const REAL_BUSINESSES_RADIUS_M = 100;
+/** Real businesses – 74m radius so you can test at home (e.g. 75m out of range, move to <74m to see ad). */
+const REAL_BUSINESSES_RADIUS_M = 74;
 const REAL_BUSINESSES = [
   {
     name: 'Nabi Yuna',
@@ -378,11 +378,34 @@ async function main() {
     70_000
   );
 
-  // --- 3b) Campaigns for real businesses ---
-  for (let i = 0; i < REAL_BUSINESSES.length; i++) {
-    const b = REAL_BUSINESSES[i];
-    const { id } = realBusinesses[i];
-    await createCampaignForBusiness(
+  // --- 3b) Set radius to 74m for existing real-business campaigns (so re-seed updates radius) ---
+  const realBusinessIds = realBusinesses.map((r) => r.id);
+  const existingRealCampaigns = await prisma.campaign.findMany({
+    where: { businessId: { in: realBusinessIds } },
+    select: { id: true, geofence: true },
+  });
+  for (const camp of existingRealCampaigns) {
+    const geo = camp.geofence as { type?: string; lat?: number; lng?: number; radiusMeters?: number } | null;
+    if (geo && geo.type === 'circle' && typeof geo.lat === 'number' && typeof geo.lng === 'number') {
+      await prisma.campaign.update({
+        where: { id: camp.id },
+        data: { geofence: { ...geo, radiusMeters: REAL_BUSINESSES_RADIUS_M } },
+      });
+    }
+  }
+  if (existingRealCampaigns.length > 0) {
+    console.log(`Updated ${existingRealCampaigns.length} real-business campaign(s) to radius ${REAL_BUSINESSES_RADIUS_M}m`);
+  }
+
+  // --- 3c) Create campaigns for real businesses (only if none exist yet) ---
+  const hasRealCampaigns = await prisma.campaign.count({ where: { businessId: { in: realBusinessIds } } });
+  if (hasRealCampaigns > 0) {
+    console.log(`Real businesses already have campaigns (radius ${REAL_BUSINESSES_RADIUS_M}m). Skipping create.`);
+  } else {
+    for (let i = 0; i < REAL_BUSINESSES.length; i++) {
+      const b = REAL_BUSINESSES[i];
+      const { id } = realBusinesses[i];
+      await createCampaignForBusiness(
       prisma,
       id,
       b.name,
@@ -395,6 +418,7 @@ async function main() {
       0.02,
       b.dailyBudget ?? null,
     );
+  }
   }
 
   // --- Drivers: driver-1 has no filters so you see all ads ---

@@ -5,6 +5,12 @@
 const PREFIX = '[Adrive]';
 
 export const logger = {
+  debug(message: string, data?: Record<string, unknown>) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      if (data) console.log(`${PREFIX} ${message}`, data);
+      else console.log(`${PREFIX} ${message}`);
+    }
+  },
   info(message: string, data?: Record<string, unknown>) {
     if (data) console.log(`${PREFIX} ${message}`, data);
     else console.log(`${PREFIX} ${message}`);

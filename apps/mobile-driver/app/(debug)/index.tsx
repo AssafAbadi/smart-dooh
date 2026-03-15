@@ -6,6 +6,7 @@ import { useLocationStore } from '../../src/stores/locationStore';
 import { useDeviceStore } from '../../src/stores/deviceStore';
 import { useAdStore } from '../../src/stores/adStore';
 import { useSimulatorStore } from '../../src/stores/simulatorStore';
+import { getApiBase } from '../../src/services/apiClient';
 import { colors } from '../../src/theme/colors';
 
 export default function DebugScreen() {
@@ -43,6 +44,10 @@ export default function DebugScreen() {
           <Text style={styles.dataRow}>Geohash: {geohash ?? '—'}</Text>
           <Text style={styles.dataRow}>Unique devices: {uniqueCount}</Text>
           <Text style={styles.dataRow}>Ad Visual: {instructions.length} active</Text>
+          <Text style={styles.dataRow}>API base (ranked/ads): {getApiBase()}</Text>
+          <Text style={[styles.dataRow, { marginTop: 4, fontSize: 11 }]}>
+            If this is localhost or 192.168.x, ads will not update on cellular. Use ngrok in apps/mobile-driver/.env and run Expo from that folder; try --clear if wrong.
+          </Text>
         </View>
         <Text style={styles.sectionLabel}>Stats</Text>
         <View style={styles.chartPlaceholder}>

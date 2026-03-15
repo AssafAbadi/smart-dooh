@@ -11,6 +11,8 @@ npm start
 
 Use the QR code or the `exp://` URL from the terminal. **Phone and PC must be on the same WiFi.**
 
+**If the app doesn’t load after scanning** (terminal shows “No apps connected”, app never opens): the QR code points at your PC’s LAN IP. If the phone is on cellular or another WiFi, it can’t reach that. Use **tunnel** below. If the phone is on the same WiFi, Windows Firewall may be blocking Metro—allow Node when prompted, or use tunnel.
+
 ---
 
 ## Optional: tunnel (phone on a different network)
@@ -49,4 +51,11 @@ To test the app when you **leave your home WiFi** (e.g. walk outside with the ph
      `npm run start:tunnel`  
      Then scan the tunnel QR with Expo Go. The app will load from the tunnel; API calls still go to `EXPO_PUBLIC_API_URL` (ngrok).
 
-**Summary:** Set `EXPO_PUBLIC_API_URL` to your ngrok backend URL before leaving the house. Use `npm run start:tunnel` if you need to reload the app while on cellular. With ngrok + (optional) tunnel, it will work when you’re out of the house.
+**Summary:** Set `EXPO_PUBLIC_API_URL` to your ngrok backend URL **before** leaving the house. **Reload the app** (Expo: shake device → Reload) after changing `.env` so the running app picks up the new URL; the value is fixed when the bundle loads. Use `npm run start:tunnel` if you need to reload the app while on cellular. With ngrok + (optional) tunnel, it will work when you’re out of the house.
+
+**If the ad stays stuck** (e.g. still shows Nabi Yuna after you walk 500m, or preference changes don’t apply) when you’re on cellular, the app is not reaching the backend. Fix: set `EXPO_PUBLIC_API_URL` to your ngrok URL in `apps/mobile-driver/.env`, then **reload the app** (shake → Reload) so it uses that URL. In dev, the app logs on startup: `[apiClient] API base: ngrok (OK for cellular)` or `LAN IP – ads stick when you leave WiFi…` **Why ads stick on cellular:** The ad only changes when a ranked request (GET `/ad-selection/ranked`) succeeds. The distance is computed on the phone from live GPS to the current ad, so it keeps updating even when the API fails. Fix: ngrok in `.env`, reload app before leaving WiFi, keep `ngrok http 3000` running. The app also triggers an immediate ranked fetch when you have moved 100m+ from the last successful response.
+
+### Quick check before going outside (cellular test)
+
+1. **Simulator:** Turn on “Simulator” in the app and advance the route. Ads should change as the fake car moves. If that works, the backend and ad logic are fine.
+2. **After changing .env:** Restart the Expo server (Ctrl+C, then run `npm start` or `npm run start:tunnel` again) so the new `EXPO_PUBLIC_API_URL` is baked into the bundle; then reload the app on the phone (shake → Reload). With `npm start`, the script now passes `.env` to Expo so ngrok in `.env` is used even when starting via LAN.

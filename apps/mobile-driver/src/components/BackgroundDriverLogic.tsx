@@ -13,8 +13,11 @@ import { connectSocket, updateSocketPosition, disconnectSocket } from '../servic
 import { refreshShelterCache } from '../services/shelterCache';
 import { getApiBase, apiHeaders } from '../services/apiClient';
 import { logger } from '../utils/logger';
+import { haversineMeters } from '@smart-dooh/shared-geo';
 
 const API_BASE = getApiBase();
+/** When user has moved this many meters from last successful ranked response, trigger an immediate ranked fetch so new nearby ads appear (helps when on cellular and some requests fail). */
+const MOVE_THRESHOLD_FOR_REFRESH_M = 100;
 const DEVICE_ID_KEY = 'adrive_device_id';
 
 let fallbackDeviceId: string | null = null;
@@ -44,12 +47,14 @@ async function getDeviceId(): Promise<string> {
  * keep working in the background regardless of which screen is open.
  */
 export function BackgroundDriverLogic() {
-  const { setInstructions, refreshTrigger } = useAdStore();
+  const { setInstructions, refreshTrigger, requestRefresh } = useAdStore();
   const { enqueue, getQueue, dequeue } = useOfflineQueueStore();
   const { lat, lng, geohash, isSimulated } = useLocationStore();
   const deviceIdRef = useRef<string | null>(null);
   const lastRecordedKeyRef = useRef<string | null>(null);
   const lastEnqueuedFromLastRef = useRef<string | null>(null);
+  const lastSuccessfulRankedLatRef = useRef<number | null>(null);
+  const lastSuccessfulRankedLngRef = useRef<number | null>(null);
 
   useLocation();
   useSimulatorPosition();
@@ -128,8 +133,12 @@ export function BackgroundDriverLogic() {
     const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
     const url = `${API_BASE}/ad-selection/ranked?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&geohash=${geohash}&timeHour=${new Date().getHours()}`;
     logger.info('Ranked request', { lat, lng, geohash });
-    fetch(url, { headers: apiHeaders({ 'x-device-id': deviceId }) })
+    const RANKED_FETCH_TIMEOUT_MS = 15000;
+    const ac = new AbortController();
+    const timeoutId = setTimeout(() => ac.abort(), RANKED_FETCH_TIMEOUT_MS);
+    fetch(url, { headers: apiHeaders({ 'x-device-id': deviceId }), signal: ac.signal })
       .then((r) => {
+        clearTimeout(timeoutId);
         if (!r.ok) {
           logger.warn('Ad-selection ranked failed', { status: r.status, driverId });
           if (r.status === 429) lastAdFetchTimeRef.current = 0;
@@ -143,10 +152,14 @@ export function BackgroundDriverLogic() {
         return r.json().then((data) => ({ res: r, data }));
       })
       .then(({ data }) => {
-        if (data != null && Array.isArray(data.instructions) && data.instructions.length > 0) {
-          logger.info('Ranked response', { count: data.instructions.length });
-          setInstructions(data.instructions, 'ranked');
-          const first = data.instructions[0];
+        if (data == null || !Array.isArray(data.instructions)) return;
+        const list = data.instructions;
+        logger.info('Ranked response', { count: list.length });
+        setInstructions(list, 'ranked');
+        lastSuccessfulRankedLatRef.current = lat;
+        lastSuccessfulRankedLngRef.current = lng;
+        if (list.length === 0) return;
+        const first = list[0];
           if (first?.emergencyData) {
             const ed = first.emergencyData;
             useEmergencyStore.getState().setAlert(
@@ -198,10 +211,29 @@ export function BackgroundDriverLogic() {
               }
             }
           }
-        }
       })
-      .catch((e) => logger.error('Ad-selection ranked error', e));
+      .catch((e) => {
+        clearTimeout(timeoutId);
+        if (e?.name === 'AbortError') {
+          logger.warn('Ad-selection ranked timeout (e.g. on cellular) – will retry next poll');
+          lastAdFetchTimeRef.current = 0;
+        }
+        logger.error('Ad-selection ranked error', e);
+      });
   }, [lat, lng, geohash, isSimulated, setInstructions, enqueue, getQueue, dequeue]);
+
+  // When user has moved significantly from where we last got a successful ranked result, trigger an immediate ranked fetch so new nearby businesses appear (e.g. after walking/driving on cellular when some requests had failed).
+  useEffect(() => {
+    if (lat == null || lng == null || isSimulated) return;
+    const lastLat = lastSuccessfulRankedLatRef.current;
+    const lastLng = lastSuccessfulRankedLngRef.current;
+    if (lastLat == null || lastLng == null) return;
+    const moved = haversineMeters(lat, lng, lastLat, lastLng);
+    if (moved >= MOVE_THRESHOLD_FOR_REFRESH_M) {
+      lastAdFetchTimeRef.current = 0;
+      requestRefresh();
+    }
+  }, [lat, lng, isSimulated, requestRefresh]);
 
   // In simulator mode poll every 6s (rate limit 5s) so ads update as the route advances
   useAdaptivePolling(fetchRanked, {
