@@ -130,7 +130,7 @@ x-admin-api-key: YOUR_ADMIN_API_KEY
 
 If `ADMIN_API_KEY` is not set, omit the header or send an empty body `{}`.
 
-**Windows CMD (use one line; do not put a backslash `\` at the end or you get "Bad hostname"):**
+**Windows CMD or PowerShell (single line; no backslash `\` at end or you get "Bad hostname").** If `ADMIN_API_KEY` is set, add `-H "x-admin-api-key: YOUR_ADMIN_API_KEY"`:
 ```cmd
 curl -X POST http://localhost:3000/emergency/test-alert -H "Content-Type: application/json" -d "{\"areas\": [\"תל אביב - מרכז העיר\"], \"headline\": \"אזעקת טילים - בדיקה\"}"
 ```
@@ -239,6 +239,15 @@ You cannot reliably “test” a real alarm on demand; you can only run the app 
 | 3 | Redis stores alert state; socket sends `ALERT_ACTIVE` to drivers | Same: Redis + socket |
 
 So the **same code** runs after the alert is detected. The difference is **how** the alert is detected: test = you trigger it; real = we must **receive** it from the Pikud HaOref API. If you didn't get a real alarm, one of these is likely:
+
+#### Why don't I get a popup when the app has been in the background for a while?
+
+The app receives alerts over **Socket.io**. When the app is in the background, the OS can **suspend it and close the connection** after a short time (seconds to minutes). We do **not** disconnect the socket when you leave the app—the OS does. So:
+
+- **Test alarm right after backgrounding:** The socket is often still connected → you get the popup.
+- **Real alarm (or test) after the app has been backgrounded for a long time:** Socket is usually closed → no push is delivered → no popup. When you **open the app**, it reconnects and the backend sends the current alert on register, so you see the overlay (and can get the popup then).
+
+**To get a popup even when the app has not been opened for a long time**, you need **remote push notifications** (FCM on Android, APNs on iOS): the backend would send a push when an alert is triggered, and the system would show the notification. That requires adding push (Expo Push, FCM, APNs) and sending from the backend when `handleNewAlert` runs. The current design uses only Socket.io + on-register resend.
 
 1. **Backend was not running** or was **restarted after the alarm ended**. The API usually clears the alert from the feed within 1–2 minutes, so if the backend was down or restarted later, it never saw the data.
 2. **Area filter (before you set EMERGENCY_SHOW_ALL_ISRAEL_ALERTS).** By default we only process alerts whose area is in the Tel Aviv list. An alarm in the **north** would have been ignored unless `EMERGENCY_SHOW_ALL_ISRAEL_ALERTS=true` was set **before** that alarm.

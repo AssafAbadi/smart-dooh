@@ -5,10 +5,11 @@ import {
   OnGatewayDisconnect,
   SubscribeMessage,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, forwardRef } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import type { EmergencyData } from './interfaces/emergency.interface';
 import { registerPayloadSchema, updatePositionPayloadSchema } from './interfaces/validation-schemas';
+import { EmergencyService } from './emergency.service';
 
 interface ConnectedDriver {
   readonly socketId: string;
@@ -25,6 +26,11 @@ export class EmergencyGateway implements OnGatewayConnection, OnGatewayDisconnec
   private readonly logger = new Logger(EmergencyGateway.name);
   private readonly drivers = new Map<string, ConnectedDriver>();
   private readonly socketToDriver = new Map<string, string>();
+
+  constructor(
+    @Inject(forwardRef(() => EmergencyService))
+    private readonly emergencyService: EmergencyService,
+  ) {}
 
   @WebSocketServer()
   server!: Server;
@@ -43,7 +49,7 @@ export class EmergencyGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('register')
-  handleRegister(client: Socket, payload: unknown): void {
+  async handleRegister(client: Socket, payload: unknown): Promise<void> {
     const parsed = registerPayloadSchema.safeParse(payload);
     if (!parsed.success) {
       this.logger.warn({ msg: 'Invalid register payload', errors: parsed.error.flatten(), socketId: client.id });
@@ -57,6 +63,14 @@ export class EmergencyGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.drivers.set(driverId, { socketId: client.id, driverId, lat, lng });
     this.socketToDriver.set(client.id, driverId);
     this.logger.log({ msg: 'Driver registered', driverId, lat, lng, socketId: client.id });
+
+    // If there is an active alert and this driver is in zone, send ALERT_ACTIVE so the app shows the popup
+    // (covers real alerts when the app was in background and missed the initial push)
+    const emergencyData: EmergencyData | null = await this.emergencyService.getEmergencyDataForLocation(lat, lng);
+    if (emergencyData) {
+      client.emit('ALERT_ACTIVE', emergencyData);
+      this.logger.log({ msg: 'Sent current alert to driver on register', driverId });
+    }
   }
 
   @SubscribeMessage('updatePosition')

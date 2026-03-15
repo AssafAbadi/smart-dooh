@@ -77,21 +77,22 @@ export function getDisplayHtml(driverId: string): string {
       to { opacity: 0; }
     }
     .placeholder { color: #666; font-size: clamp(1.2rem, 3vw, 2rem); }
-    /* Emergency alert: red and yellow like the app */
-    body.emergency { background: #CC0000; color: #fff; }
-    body.emergency .emergency-topBand { background: #990000; width: 100%; padding: 1rem 0; text-align: center; }
-    body.emergency .emergency-alertType { color: #FFD700; font-size: clamp(1.8rem, 5vw, 2.5rem); font-weight: 900; letter-spacing: 0.05em; }
-    body.emergency .emergency-alertTypeHe { color: #FFD700; font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 800; margin-top: 0.2rem; }
-    body.emergency .emergency-headline { color: #fff; font-size: clamp(1.1rem, 3.5vw, 1.4rem); font-weight: 600; margin: 0.5rem 0; }
-    body.emergency .emergency-arrow { color: #FFD700; font-size: clamp(5rem, 18vw, 9rem); font-weight: 900; line-height: 1; margin: 0.2em 0; }
-    body.emergency .emergency-shelterLabel { color: rgba(255,255,255,0.8); font-size: clamp(0.85rem, 2.5vw, 1rem); font-weight: 600; letter-spacing: 0.1em; margin-top: 0.5rem; }
-    body.emergency .emergency-address { color: #fff; font-size: clamp(1.2rem, 4vw, 1.6rem); font-weight: 700; margin: 0.3rem 0 0.5rem; }
-    body.emergency .emergency-distanceBadge { background: #FFD700; color: #000; border-radius: 12px; padding: 0.5rem 1.2rem; margin: 0.5rem 0; display: inline-block; }
-    body.emergency .emergency-distanceText { font-size: clamp(1.8rem, 5vw, 2.5rem); font-weight: 900; }
-    body.emergency .emergency-distanceSubtext { font-size: 0.7rem; color: rgba(0,0,0,0.6); }
-    body.emergency .emergency-instruction { color: rgba(255,255,255,0.9); font-size: clamp(0.95rem, 2.8vw, 1.1rem); margin-top: 0.5rem; }
-    body.emergency .emergency-bottomBand { background: #990000; width: 100%; padding: 1rem 0; text-align: center; margin-top: auto; }
-    body.emergency .emergency-bottomText { color: #FFD700; font-size: clamp(0.85rem, 2.5vw, 1rem); font-weight: 600; }
+    /* Emergency alert: red and yellow like the app – fit viewport, no scroll */
+    body.emergency { background: #CC0000; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; padding: 0; }
+    body.emergency .slot { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(0.5rem, 1.5vh, 1rem) 4vw; }
+    body.emergency .emergency-topBand { background: #990000; width: 100%; padding: clamp(0.4rem, 1.2vh, 1rem) 0; text-align: center; flex-shrink: 0; }
+    body.emergency .emergency-alertType { color: #FFD700; font-size: clamp(1rem, 2.8vh, 2.5rem); font-weight: 900; letter-spacing: 0.05em; }
+    body.emergency .emergency-alertTypeHe { color: #FFD700; font-size: clamp(0.85rem, 2.2vh, 2rem); font-weight: 800; margin-top: 0.1rem; }
+    body.emergency .emergency-headline { color: #fff; font-size: clamp(0.7rem, 2vh, 1.4rem); font-weight: 600; margin: 0.2rem 0; }
+    body.emergency .emergency-arrow { color: #FFD700; font-size: clamp(3rem, 12vh, 9rem); font-weight: 900; line-height: 1; margin: 0.1em 0; flex-shrink: 0; }
+    body.emergency .emergency-shelterLabel { color: rgba(255,255,255,0.8); font-size: clamp(0.65rem, 1.8vh, 1rem); font-weight: 600; letter-spacing: 0.1em; margin-top: 0.2rem; }
+    body.emergency .emergency-address { color: #fff; font-size: clamp(0.75rem, 2.2vh, 1.6rem); font-weight: 700; margin: 0.2rem 0 0.3rem; }
+    body.emergency .emergency-distanceBadge { background: #FFD700; color: #000; border-radius: 12px; padding: 0.35rem 1rem; margin: 0.3rem 0; display: inline-block; }
+    body.emergency .emergency-distanceText { font-size: clamp(1rem, 3vh, 2.5rem); font-weight: 900; }
+    body.emergency .emergency-distanceSubtext { font-size: 0.6rem; color: rgba(0,0,0,0.6); }
+    body.emergency .emergency-instruction { color: rgba(255,255,255,0.9); font-size: clamp(0.7rem, 2vh, 1.1rem); margin-top: 0.2rem; }
+    body.emergency .emergency-bottomBand { background: #990000; width: 100%; padding: clamp(0.4rem, 1.2vh, 1rem) 0; text-align: center; flex-shrink: 0; }
+    body.emergency .emergency-bottomText { color: #FFD700; font-size: clamp(0.7rem, 2vh, 1rem); font-weight: 600; }
   </style>
 </head>
 <body>

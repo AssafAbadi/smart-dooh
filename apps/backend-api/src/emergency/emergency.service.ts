@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, forwardRef } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ALERT_NEW_EVENT, ALERT_CLEAR_EVENT } from './pikud-haoref.service';
 import { EmergencyGateway } from './emergency.gateway';
@@ -24,6 +24,7 @@ export class EmergencyService {
   private readonly showAllIsraelAlerts: boolean;
 
   constructor(
+    @Inject(forwardRef(() => EmergencyGateway))
     private readonly gateway: EmergencyGateway,
     private readonly shelterSelector: ShelterSelectorService,
     private readonly alertStateRepo: AlertStateRepository,
