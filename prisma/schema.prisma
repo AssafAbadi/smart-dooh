@@ -30,6 +30,7 @@ enum PreferenceFilter {
 model Driver {
   id         String             @id @default(uuid())
   balance   Float              @default(0) // ILS, updated in real-time per estimated impression
+  pushToken String?            // Expo push token for remote notifications
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
   preferences DriverPreferences?

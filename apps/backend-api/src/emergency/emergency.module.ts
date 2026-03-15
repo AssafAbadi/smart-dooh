@@ -3,6 +3,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { RedisModule } from '../redis/redis.module';
 import { ShelterModule } from '../shelter/shelter.module';
 import { ObservabilityModule } from '../observability/observability.module';
+import { DriverModule } from '../driver/driver.module';
 import { PikudHaorefService } from './pikud-haoref.service';
 import { EmergencyService } from './emergency.service';
 import { EmergencyGateway } from './emergency.gateway';
@@ -20,6 +21,7 @@ import { TOKENS } from '../core/constants/tokens';
     RedisModule,
     ShelterModule,
     ObservabilityModule,
+    DriverModule,
   ],
   controllers: [EmergencyController],
   providers: [

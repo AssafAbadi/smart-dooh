@@ -97,3 +97,8 @@ export {
   type EmergencyData,
   type EmergencyCheckResult,
 } from './emergency.dto';
+export {
+  registerPushTokenSchema,
+  registerPushTokenSafeParse,
+  type RegisterPushTokenDto,
+} from './push-token.dto';

@@ -240,14 +240,19 @@ You cannot reliably “test” a real alarm on demand; you can only run the app 
 
 So the **same code** runs after the alert is detected. The difference is **how** the alert is detected: test = you trigger it; real = we must **receive** it from the Pikud HaOref API. If you didn't get a real alarm, one of these is likely:
 
-#### Why don't I get a popup when the app has been in the background for a while?
+#### Why don't I get a push notification (popup) when the app is closed or in the background?
 
-The app receives alerts over **Socket.io**. When the app is in the background, the OS can **suspend it and close the connection** after a short time (seconds to minutes). We do **not** disconnect the socket when you leave the app—the OS does. So:
+The backend sends **Expo push notifications** to all drivers who have registered a push token (and, for offline drivers, either have a recent location in the alert zone or, in show-all-Israel mode, use default coords). If you don't see a popup:
 
-- **Test alarm right after backgrounding:** The socket is often still connected → you get the popup.
-- **Real alarm (or test) after the app has been backgrounded for a long time:** Socket is usually closed → no push is delivered → no popup. When you **open the app**, it reconnects and the backend sends the current alert on register, so you see the overlay (and can get the popup then).
-
-**To get a popup even when the app has not been opened for a long time**, you need **remote push notifications** (FCM on Android, APNs on iOS): the backend would send a push when an alert is triggered, and the system would show the notification. That requires adding push (Expo Push, FCM, APNs) and sending from the backend when `handleNewAlert` runs. The current design uses only Socket.io + on-register resend.
+1. **Register the token first**
+   - Open the **driver app**, allow **notifications** when prompted, and go to the **main screen** (drawer) so that location is available. The app then calls `POST /drivers/push-token` and registers your Expo push token. If you never open the app or never reach the main screen, no token is stored and no push is sent.
+2. **Check backend logs** when you trigger a test alert:
+   - **"No drivers with push tokens"** → Open the app once, allow notifications, and stay on the main screen until you see "Push token registered" in the app logs (or retry the test alert after opening the app).
+   - **"Sending push to offline drivers"** and **"Push batch completed"** with `sent: 1` → The backend sent the push; if the device still doesn't show it, see (3).
+3. **Expo Go vs development build**
+   - **Expo Go** may not show push notifications for custom backends or may require the app to be in the foreground. For reliable push when the app is closed or in the background, use a **development build** (e.g. `eas build --profile development`) with FCM (Android) / APNs (iOS) configured.
+4. **Test mode**
+   - For test alerts to send push to **offline** drivers (app closed), set **`EMERGENCY_SHOW_ALL_ISRAEL_ALERTS=true`** in backend `.env`. Otherwise only drivers with a **recent** last-known location (Redis, ~5 min TTL) in the alert zone get push.
 
 1. **Backend was not running** or was **restarted after the alarm ended**. The API usually clears the alert from the feed within 1–2 minutes, so if the backend was down or restarted later, it never saw the data.
 2. **Area filter (before you set EMERGENCY_SHOW_ALL_ISRAEL_ALERTS).** By default we only process alerts whose area is in the Tel Aviv list. An alarm in the **north** would have been ignored unless `EMERGENCY_SHOW_ALL_ISRAEL_ALERTS=true` was set **before** that alarm.

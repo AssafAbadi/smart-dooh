@@ -24,6 +24,7 @@ import { DisplayModule } from './display/display.module';
 import { DriverModule } from './driver/driver.module';
 import { ShelterModule } from './shelter/shelter.module';
 import { EmergencyModule } from './emergency/emergency.module';
+import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { EmergencyModule } from './emergency/emergency.module';
     DriverModule,
     ShelterModule,
     EmergencyModule,
+    PushNotificationsModule,
   ],
 })
 export class AppModule {}

@@ -5,7 +5,7 @@ import '../src/sentry';
 import { colors } from '../src/theme/colors';
 
 import { getApiBase } from '../src/services/apiClient';
-import { initEmergencyNotifications } from '../src/services/emergencyNotificationService';
+import { initEmergencyNotifications, handleLastNotificationResponseIfEmergency } from '../src/services/emergencyNotificationService';
 
 const API_BASE = getApiBase();
 
@@ -17,6 +17,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     initEmergencyNotifications();
+  }, []);
+
+  useEffect(() => {
+    handleLastNotificationResponseIfEmergency();
   }, []);
 
   return (

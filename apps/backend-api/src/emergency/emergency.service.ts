@@ -11,6 +11,9 @@ import type { IRedisService } from '../core/interfaces/redis.interface';
 import type { ActiveAlert } from './interfaces/pikud-haoref.interface';
 import type { EmergencyCheckResult, EmergencyData } from './interfaces/emergency.interface';
 import { MetricsService } from '../observability/metrics.service';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { DriverRepository } from '../driver/repositories/driver.repository';
+import { DriverLocationService } from '../driver/driver-location.service';
 
 const DISPLAY_LAST_KEY_PREFIX = 'display:last:';
 /** Match ad-selection.controller TTL so display and app stay in sync. */
@@ -32,6 +35,9 @@ export class EmergencyService {
     private readonly config: ConfigService,
     @Inject(TOKENS.IRedisService) @Optional() private readonly redis?: IRedisService,
     @Optional() private readonly metrics?: MetricsService,
+    @Optional() private readonly pushNotifications?: PushNotificationsService,
+    @Optional() private readonly driverRepository?: DriverRepository,
+    @Optional() private readonly driverLocationService?: DriverLocationService,
   ) {
     const v = this.config.get('EMERGENCY_SHOW_ALL_ISRAEL_ALERTS');
     this.showAllIsraelAlerts = v === 'true' || v === '1';
@@ -97,13 +103,26 @@ export class EmergencyService {
             shelter: emergencyData.shelterAddress,
             latencyMs: Date.now() - alertStart,
           });
+          return { driverId: driver.driverId, emergencyData } as const;
         }
+        return null;
       }),
     );
 
     const failures = results.filter((r) => r.status === 'rejected');
     if (failures.length > 0) {
       this.logger.error({ msg: 'Some driver notifications failed', failureCount: failures.length });
+    }
+
+    const driverEmergencyPairs = results
+      .filter((r): r is PromiseFulfilledResult<{ driverId: string; emergencyData: EmergencyData } | null> => r.status === 'fulfilled' && r.value != null)
+      .map((r) => r.value as { driverId: string; emergencyData: EmergencyData });
+
+    // Fire-and-forget: send push to connected drivers and to offline drivers (with push token + last-known location in zone).
+    if (this.pushNotifications && this.driverRepository) {
+      this.addOfflineDriversAndSendPush(alert, driverEmergencyPairs).catch((err) =>
+        this.logger.error({ msg: 'Push batch failed', error: err instanceof Error ? err.message : String(err) }),
+      );
     }
 
     // When no drivers are connected (e.g. test alert before app opens), still cache emergency for
@@ -159,6 +178,135 @@ export class EmergencyService {
     } catch (e) {
       this.logger.warn({ driverId, msg: 'Failed to cache emergency for display', error: e instanceof Error ? e.message : String(e) });
     }
+  }
+
+  /** Default Tel Aviv coords when we have no driver location (e.g. show-all-Israel or expired Redis). */
+  private static readonly DEFAULT_ALERT_LAT = 32.08;
+  private static readonly DEFAULT_ALERT_LNG = 34.78;
+
+  /**
+   * Add drivers who are not connected but have a push token (using last-known location or default coords in show-all mode).
+   * Then send push to all (connected + offline). Ensures alerts reach app-closed/backgrounded drivers.
+   */
+  private async addOfflineDriversAndSendPush(
+    alert: ActiveAlert,
+    connectedPairs: Array<{ driverId: string; emergencyData: EmergencyData }>,
+  ): Promise<void> {
+    if (!this.pushNotifications || !this.driverRepository) return;
+
+    const connectedSet = new Set(connectedPairs.map((p) => p.driverId));
+    let driverIdsWithTokens: string[];
+    try {
+      driverIdsWithTokens = await this.driverRepository.getDriverIdsWithPushTokens();
+    } catch (e) {
+      this.logger.warn({ msg: 'Failed to get driver IDs with push tokens', error: e instanceof Error ? e.message : String(e) });
+      driverIdsWithTokens = [];
+    }
+    if (driverIdsWithTokens.length === 0 && connectedPairs.length === 0) {
+      this.logger.log({ msg: 'No drivers with push tokens; open the driver app, allow notifications, and enter the main screen to register for push alerts' });
+      return;
+    }
+    if (driverIdsWithTokens.length === 0) {
+      await this.sendPushNotificationsForAlert(connectedPairs);
+      return;
+    }
+
+    const offlineDriverIds = driverIdsWithTokens.filter((id) => !connectedSet.has(id));
+    if (offlineDriverIds.length === 0) {
+      await this.sendPushNotificationsForAlert(connectedPairs);
+      return;
+    }
+
+    const offlinePairs: Array<{ driverId: string; emergencyData: EmergencyData }> = [];
+    for (const driverId of offlineDriverIds) {
+      try {
+        let lat: number;
+        let lng: number;
+        let usedDefault = false;
+        if (this.driverLocationService) {
+          const loc = await this.driverLocationService.getLastLocation(driverId);
+          if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+            if (!this.showAllIsraelAlerts && !this.zoneMatcher.isDriverInAlertZone(loc.lat, loc.lng)) continue;
+            lat = loc.lat;
+            lng = loc.lng;
+          } else {
+            if (!this.showAllIsraelAlerts) continue;
+            lat = EmergencyService.DEFAULT_ALERT_LAT;
+            lng = EmergencyService.DEFAULT_ALERT_LNG;
+            usedDefault = true;
+          }
+        } else {
+          if (!this.showAllIsraelAlerts) continue;
+          lat = EmergencyService.DEFAULT_ALERT_LAT;
+          lng = EmergencyService.DEFAULT_ALERT_LNG;
+          usedDefault = true;
+        }
+        const emergencyData = await this.shelterSelector.selectShelter(
+          lat,
+          lng,
+          alert.title,
+          alert.detectedAt.toISOString(),
+        );
+        if (emergencyData) {
+          offlinePairs.push({ driverId, emergencyData });
+          if (usedDefault) {
+            this.logger.log({ msg: 'Offline driver push with default coords (no recent location)', driverId });
+          }
+        }
+      } catch (e) {
+        this.logger.debug({ msg: 'Skip offline driver', driverId, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    if (offlinePairs.length > 0) {
+      this.logger.log({ msg: 'Sending push to offline drivers', count: offlinePairs.length, driverIds: offlinePairs.map((p) => p.driverId) });
+    }
+
+    const allPairs = [...connectedPairs, ...offlinePairs];
+    if (allPairs.length > 0) {
+      await this.sendPushNotificationsForAlert(allPairs);
+    } else {
+      this.logger.warn({ msg: 'No push recipients (connected or offline) for alert' });
+    }
+  }
+
+  /**
+   * Send push notifications to drivers with registered Expo push tokens.
+   * Payload includes full shelter data so the app can restore state on tap without an API call.
+   */
+  private async sendPushNotificationsForAlert(
+    driverEmergencyPairs: Array<{ driverId: string; emergencyData: EmergencyData }>,
+  ): Promise<void> {
+    if (!this.pushNotifications || !this.driverRepository) return;
+    const driverIds = driverEmergencyPairs.map((p) => p.driverId);
+    const tokenMap = await this.driverRepository.getDriversPushTokens(driverIds);
+    const items = driverEmergencyPairs
+      .map(({ driverId, emergencyData }) => {
+        const token = tokenMap.get(driverId);
+        if (!token) return null;
+        return {
+          token,
+          payload: {
+            title: '🚨 אזעקת טילים - כנס למרחב מוגן!',
+            body: emergencyData.alertHeadline,
+            data: {
+              type: 'EMERGENCY_ALERT' as const,
+              shelterLat: emergencyData.shelterLat,
+              shelterLng: emergencyData.shelterLng,
+              shelterAddress: emergencyData.shelterAddress,
+              headline: emergencyData.alertHeadline,
+              distanceMeters: emergencyData.distanceMeters,
+              bearingDegrees: emergencyData.bearingDegrees,
+              direction: emergencyData.direction,
+            },
+            priority: 'high' as const,
+            sound: 'default' as const,
+            channelId: 'emergency-alerts',
+          },
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+    if (items.length === 0) return;
+    await this.pushNotifications.sendBatch(items);
   }
 
   /** Clear display:last cache so the app stops showing the emergency as "From display (synced)". */

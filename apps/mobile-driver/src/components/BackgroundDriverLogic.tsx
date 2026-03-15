@@ -12,6 +12,7 @@ import { syncWithBackoff, createImpressionSender } from '../services/impressionS
 import { connectSocket, updateSocketPosition, disconnectSocket } from '../services/socketService';
 import { refreshShelterCache, getNearestCachedShelter, cachedShelterToShelterInfo } from '../services/shelterCache';
 import { scheduleEmergencyAlert } from '../services/emergencyNotificationService';
+import { registerPushToken } from '../services/pushNotificationService';
 import { getApiBase, apiHeaders } from '../services/apiClient';
 import { logger } from '../utils/logger';
 import { haversineMeters } from '@smart-dooh/shared-geo';
@@ -74,7 +75,7 @@ export function BackgroundDriverLogic() {
     return () => { cancelled = true; };
   }, []);
 
-  // Connect emergency socket once we have a valid position.
+  // Connect emergency socket once we have a valid position. Register push token so backend can send remote alerts.
   // Must depend on lat/lng so the effect re-runs when location becomes available.
   const hasConnectedRef = useRef(false);
   useEffect(() => {
@@ -82,6 +83,7 @@ export function BackgroundDriverLogic() {
     hasConnectedRef.current = true;
     const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
     connectSocket(driverId, lat, lng);
+    registerPushToken(driverId).catch(() => {});
     return () => {
       disconnectSocket();
       hasConnectedRef.current = false;
