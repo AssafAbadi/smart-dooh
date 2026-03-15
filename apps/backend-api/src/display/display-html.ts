@@ -77,6 +77,21 @@ export function getDisplayHtml(driverId: string): string {
       to { opacity: 0; }
     }
     .placeholder { color: #666; font-size: clamp(1.2rem, 3vw, 2rem); }
+    /* Emergency alert: red and yellow like the app */
+    body.emergency { background: #CC0000; color: #fff; }
+    body.emergency .emergency-topBand { background: #990000; width: 100%; padding: 1rem 0; text-align: center; }
+    body.emergency .emergency-alertType { color: #FFD700; font-size: clamp(1.8rem, 5vw, 2.5rem); font-weight: 900; letter-spacing: 0.05em; }
+    body.emergency .emergency-alertTypeHe { color: #FFD700; font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 800; margin-top: 0.2rem; }
+    body.emergency .emergency-headline { color: #fff; font-size: clamp(1.1rem, 3.5vw, 1.4rem); font-weight: 600; margin: 0.5rem 0; }
+    body.emergency .emergency-arrow { color: #FFD700; font-size: clamp(5rem, 18vw, 9rem); font-weight: 900; line-height: 1; margin: 0.2em 0; }
+    body.emergency .emergency-shelterLabel { color: rgba(255,255,255,0.8); font-size: clamp(0.85rem, 2.5vw, 1rem); font-weight: 600; letter-spacing: 0.1em; margin-top: 0.5rem; }
+    body.emergency .emergency-address { color: #fff; font-size: clamp(1.2rem, 4vw, 1.6rem); font-weight: 700; margin: 0.3rem 0 0.5rem; }
+    body.emergency .emergency-distanceBadge { background: #FFD700; color: #000; border-radius: 12px; padding: 0.5rem 1.2rem; margin: 0.5rem 0; display: inline-block; }
+    body.emergency .emergency-distanceText { font-size: clamp(1.8rem, 5vw, 2.5rem); font-weight: 900; }
+    body.emergency .emergency-distanceSubtext { font-size: 0.7rem; color: rgba(0,0,0,0.6); }
+    body.emergency .emergency-instruction { color: rgba(255,255,255,0.9); font-size: clamp(0.95rem, 2.8vw, 1.1rem); margin-top: 0.5rem; }
+    body.emergency .emergency-bottomBand { background: #990000; width: 100%; padding: 1rem 0; text-align: center; margin-top: auto; }
+    body.emergency .emergency-bottomText { color: #FFD700; font-size: clamp(0.85rem, 2.5vw, 1rem); font-weight: 600; }
   </style>
 </head>
 <body>
@@ -107,8 +122,32 @@ export function getDisplayHtml(driverId: string): string {
     }
     function render(instruction, useFade) {
       if (!instruction) {
+        document.body.classList.remove('emergency');
         root.innerHTML = '<div class="headline">No ad</div><div class="body">No active campaign in range.</div>';
         lastAdKey = '';
+        return;
+      }
+      var isEmergency = instruction.campaignId === 'emergency';
+      document.body.classList.toggle('emergency', isEmergency);
+      if (useFade) {
+        root.classList.remove('fade-enter');
+        root.offsetHeight;
+        root.classList.add('fade-enter');
+      }
+      if (isEmergency) {
+        var headlineRaw = replacePlaceholders(instruction.headline || 'EMERGENCY ALERT', instruction, false);
+        var bodyRaw = replacePlaceholders(instruction.body || '', instruction, true);
+        var distNum = (instruction.distanceMeters != null) ? (Math.round(instruction.distanceMeters) + 'm') : '—';
+        var arrowChar = instruction.direction && DIRECTION_ARROWS[instruction.direction] ? DIRECTION_ARROWS[instruction.direction] : '↑';
+        var directionText = (instruction.direction === 'up') ? 'forward' : (instruction.direction === 'down') ? 'behind you' : (instruction.direction || '');
+        root.innerHTML = '<div class="emergency-topBand"><div class="emergency-alertType">MISSILE ALERT</div><div class="emergency-alertTypeHe">אזעקת טילים</div></div>' +
+          '<div class="emergency-headline">' + escapeHtml(headlineRaw) + '</div>' +
+          '<div class="emergency-arrow">' + escapeHtml(arrowChar) + '</div>' +
+          '<div class="emergency-shelterLabel">NEAREST SHELTER</div>' +
+          '<div class="emergency-address">' + escapeHtml(bodyRaw) + '</div>' +
+          '<div class="emergency-distanceBadge"><div class="emergency-distanceText">' + escapeHtml(distNum) + '</div><div class="emergency-distanceSubtext">straight-line</div></div>' +
+          '<div class="emergency-instruction">Head ' + escapeHtml(directionText) + ' to the nearest shelter</div>' +
+          '<div class="emergency-bottomBand"><div class="emergency-bottomText">Stay safe. Move to shelter immediately.</div></div>';
         return;
       }
       const headlineRaw = replacePlaceholders(instruction.headline || 'Special offer', instruction, false);
@@ -118,11 +157,6 @@ export function getDisplayHtml(driverId: string): string {
       const coupon = escapeHtml(instruction.couponCode || '');
       var arrowChar = instruction.direction && DIRECTION_ARROWS[instruction.direction] ? DIRECTION_ARROWS[instruction.direction] : '';
       var arrowBlock = arrowChar ? '<div class="direction-arrow">' + escapeHtml(arrowChar) + '</div>' : '';
-      if (useFade) {
-        root.classList.remove('fade-enter');
-        root.offsetHeight;
-        root.classList.add('fade-enter');
-      }
       root.innerHTML = '<div class="headline">' + headline + '</div><div class="body">' + bodyEscaped + '</div>' + arrowBlock + (coupon ? '<div class="coupon">' + coupon + '</div>' : '');
     }
 

@@ -4,6 +4,7 @@ import { useEmergencyStore } from '../stores/emergencyStore';
 import { useAdStore } from '../stores/adStore';
 import { logger } from '../utils/logger';
 import { emergencyDataSchema, emergencyCheckResultSchema } from '@smart-dooh/shared-dto';
+import { scheduleEmergencyAlert } from './emergencyNotificationService';
 
 const API_BASE = getApiBase();
 const FALLBACK_POLL_INTERVAL_MS = 2000;
@@ -42,6 +43,7 @@ function handleAlertActive(data: unknown): void {
     },
     d.alertHeadline,
   );
+  scheduleEmergencyAlert(d.shelterLat, d.shelterLng, d.alertHeadline).catch(() => {});
 }
 
 function handleAlertClear(): void {
@@ -160,6 +162,7 @@ function startFallbackPolling(): void {
           },
           data.alert.headline,
         );
+        scheduleEmergencyAlert(data.shelter.lat, data.shelter.lng, data.alert.headline).catch(() => {});
       } else if (!data.active && store.isAlertActive) {
         store.clearAlert();
       }

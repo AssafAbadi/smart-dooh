@@ -5,6 +5,7 @@ import '../src/sentry';
 import { colors } from '../src/theme/colors';
 
 import { getApiBase } from '../src/services/apiClient';
+import { initEmergencyNotifications } from '../src/services/emergencyNotificationService';
 
 const API_BASE = getApiBase();
 
@@ -12,6 +13,10 @@ export default function RootLayout() {
   useEffect(() => {
     const host = API_BASE.replace(/^https?:\/\//, '').split('/')[0];
     console.log('[Adrive] API base:', host, '(expect ngrok or your backend host; 404 = wrong host)');
+  }, []);
+
+  useEffect(() => {
+    initEmergencyNotifications();
   }, []);
 
   return (

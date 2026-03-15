@@ -11,6 +11,7 @@ import { SIMULATOR_DRIVER_ID } from '../stores/simulatorStore';
 import { syncWithBackoff, createImpressionSender } from '../services/impressionSync';
 import { connectSocket, updateSocketPosition, disconnectSocket } from '../services/socketService';
 import { refreshShelterCache, getNearestCachedShelter, cachedShelterToShelterInfo } from '../services/shelterCache';
+import { scheduleEmergencyAlert } from '../services/emergencyNotificationService';
 import { getApiBase, apiHeaders } from '../services/apiClient';
 import { logger } from '../utils/logger';
 import { haversineMeters } from '@smart-dooh/shared-geo';
@@ -201,6 +202,7 @@ export function BackgroundDriverLogic() {
               },
               ed.alertHeadline,
             );
+            scheduleEmergencyAlert(ed.shelterLat, ed.shelterLng, ed.alertHeadline).catch(() => {});
           } else if (first?.campaignId !== 'emergency') {
             const emergStore = useEmergencyStore.getState();
             if (emergStore.isAlertActive && emergStore.alertTimestamp && Date.now() - emergStore.alertTimestamp > 600_000) {

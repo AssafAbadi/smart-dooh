@@ -46,6 +46,12 @@
           "locationAlwaysAndWhenInUsePermission": "Adrive uses background location to serve relevant ads while driving.",
           "isIosBackgroundLocationEnabled": true
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
       ]
     ],
     "extra": {
