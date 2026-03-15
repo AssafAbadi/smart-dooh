@@ -1,8 +1,13 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { useLocationStore } from '../stores/locationStore';
+import { useEmergencyStore } from '../stores/emergencyStore';
+import { haversineMeters } from '@smart-dooh/shared-geo';
+import { refreshShelterCache, getNearestCachedShelter, cachedShelterToShelterInfo } from './shelterCache';
 
 const LOCATION_TASK_NAME = 'adrive-background-location';
+const SHELTER_REFETCH_DISTANCE_M = 200;
+const SHELTER_UPDATE_RATIO = 0.8;
 
 /** Simple geohash (precision ~5km) for cache/API keys. */
 export function simpleGeohash(lat: number, lng: number): string {
@@ -13,12 +18,24 @@ export function simpleGeohash(lat: number, lng: number): string {
 
 TaskManager.defineTask(
   LOCATION_TASK_NAME,
-  (event: { data: { locations: { coords: { latitude: number; longitude: number } }[] }; error: Error | null }) => {
+  async (event: { data: { locations: { coords: { latitude: number; longitude: number } }[] }; error: Error | null }) => {
     if (event.error) return;
     const locations = event.data?.locations;
     if (!locations?.length) return;
     const { latitude, longitude } = locations[locations.length - 1].coords;
     useLocationStore.getState().setLocation(latitude, longitude, simpleGeohash(latitude, longitude));
+
+    const { isAlertActive, shelter, alertHeadline } = useEmergencyStore.getState();
+    if (!isAlertActive || !shelter) return;
+    const distanceFromShelter = haversineMeters(latitude, longitude, shelter.lat, shelter.lng);
+    if (distanceFromShelter <= SHELTER_REFETCH_DISTANCE_M) return;
+
+    await refreshShelterCache(latitude, longitude);
+    const nearest = getNearestCachedShelter(latitude, longitude);
+    if (!nearest || nearest.distanceMeters >= SHELTER_UPDATE_RATIO * distanceFromShelter) return;
+
+    const newShelterInfo = cachedShelterToShelterInfo(nearest, latitude, longitude);
+    useEmergencyStore.getState().setAlert(newShelterInfo, alertHeadline ?? '');
   }
 );
 

@@ -10,7 +10,7 @@ import { useAdaptivePolling, INTERVAL_SIMULATOR_MS } from '../hooks/useAdaptiveP
 import { SIMULATOR_DRIVER_ID } from '../stores/simulatorStore';
 import { syncWithBackoff, createImpressionSender } from '../services/impressionSync';
 import { connectSocket, updateSocketPosition, disconnectSocket } from '../services/socketService';
-import { refreshShelterCache } from '../services/shelterCache';
+import { refreshShelterCache, getNearestCachedShelter, cachedShelterToShelterInfo } from '../services/shelterCache';
 import { getApiBase, apiHeaders } from '../services/apiClient';
 import { logger } from '../utils/logger';
 import { haversineMeters } from '@smart-dooh/shared-geo';
@@ -18,6 +18,9 @@ import { haversineMeters } from '@smart-dooh/shared-geo';
 const API_BASE = getApiBase();
 /** When user has moved this many meters from last successful ranked response, trigger an immediate ranked fetch so new nearby ads appear (helps when on cellular and some requests fail). */
 const MOVE_THRESHOLD_FOR_REFRESH_M = 100;
+/** When alert is active and user has moved this many meters from current shelter, re-fetch shelters and consider updating to a closer one (if new nearest < 80% of current distance). */
+const SHELTER_REFETCH_DISTANCE_M = 200;
+const SHELTER_UPDATE_RATIO = 0.8;
 const DEVICE_ID_KEY = 'adrive_device_id';
 
 let fallbackDeviceId: string | null = null;
@@ -50,6 +53,9 @@ export function BackgroundDriverLogic() {
   const { setInstructions, refreshTrigger, requestRefresh } = useAdStore();
   const { enqueue, getQueue, dequeue } = useOfflineQueueStore();
   const { lat, lng, geohash, isSimulated } = useLocationStore();
+  const isAlertActive = useEmergencyStore((s) => s.isAlertActive);
+  const shelter = useEmergencyStore((s) => s.shelter);
+  const alertHeadline = useEmergencyStore((s) => s.alertHeadline);
   const deviceIdRef = useRef<string | null>(null);
   const lastRecordedKeyRef = useRef<string | null>(null);
   const lastEnqueuedFromLastRef = useRef<string | null>(null);
@@ -86,6 +92,28 @@ export function BackgroundDriverLogic() {
     updateSocketPosition(lat, lng);
     refreshShelterCache(lat, lng).catch(() => {});
   }, [lat, lng]);
+
+  // When alert is active and user moves >200m from current shelter, re-fetch shelters and update store only if new nearest is <80% of current distance.
+  useEffect(() => {
+    if (!isAlertActive || !shelter || lat == null || lng == null) return;
+    const distanceFromShelter = haversineMeters(lat, lng, shelter.lat, shelter.lng);
+    if (distanceFromShelter <= SHELTER_REFETCH_DISTANCE_M) return;
+
+    let cancelled = false;
+    (async () => {
+      await refreshShelterCache(lat, lng);
+      if (cancelled) return;
+      const nearest = getNearestCachedShelter(lat, lng);
+      if (!nearest) return;
+      const currentDistance = distanceFromShelter;
+      if (nearest.distanceMeters >= SHELTER_UPDATE_RATIO * currentDistance) return;
+
+      const newShelterInfo = cachedShelterToShelterInfo(nearest, lat, lng);
+      const headline = useEmergencyStore.getState().alertHeadline ?? '';
+      useEmergencyStore.getState().setAlert(newShelterInfo, headline);
+    })();
+    return () => { cancelled = true; };
+  }, [isAlertActive, shelter, lat, lng]);
 
   useEffect(() => {
     const t = setInterval(() => {

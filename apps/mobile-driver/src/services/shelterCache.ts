@@ -2,7 +2,8 @@ import { MMKV } from 'react-native-mmkv';
 import { z } from 'zod';
 import { getApiBase } from './apiClient';
 import { logger } from '../utils/logger';
-import { haversineMeters } from '@smart-dooh/shared-geo';
+import { haversineMeters, bearingDegrees, bearingToDirection } from '@smart-dooh/shared-geo';
+import type { ShelterInfo } from '../stores/emergencyStore';
 
 const storage = new MMKV({ id: 'adrive-shelter-cache' });
 const KEY_SHELTERS = 'nearby_shelters';
@@ -60,6 +61,28 @@ export function getNearestCachedShelter(lat: number, lng: number): CachedShelter
     }
   }
   return nearest;
+}
+
+/**
+ * Convert a cached shelter and user position to ShelterInfo (distance, bearing, direction).
+ * Used when updating the emergency store with a re-fetched nearest shelter.
+ */
+export function cachedShelterToShelterInfo(
+  cached: CachedShelter,
+  userLat: number,
+  userLng: number,
+): ShelterInfo {
+  const distanceMeters = haversineMeters(userLat, userLng, cached.lat, cached.lng);
+  const bearing = bearingDegrees(userLat, userLng, cached.lat, cached.lng);
+  const direction = bearingToDirection(bearing);
+  return {
+    address: cached.address,
+    lat: cached.lat,
+    lng: cached.lng,
+    distanceMeters: Math.round(distanceMeters),
+    bearingDegrees: Math.round(bearing),
+    direction,
+  };
 }
 
 export async function refreshShelterCache(lat: number, lng: number): Promise<void> {

@@ -13,6 +13,8 @@ import type { EmergencyCheckResult, EmergencyData } from './interfaces/emergency
 import { MetricsService } from '../observability/metrics.service';
 
 const DISPLAY_LAST_KEY_PREFIX = 'display:last:';
+/** Match ad-selection.controller TTL so display and app stay in sync. */
+const DISPLAY_LAST_TTL_SEC = 600;
 
 @Injectable()
 export class EmergencyService {
@@ -86,6 +88,7 @@ export class EmergencyService {
 
         if (emergencyData) {
           this.gateway.emitToDriver(driver.driverId, 'ALERT_ACTIVE', emergencyData);
+          await this.cacheEmergencyForDisplay(driver.driverId, emergencyData);
           this.metrics?.recordEmergencyPushLatency((Date.now() - alertStart) / 1000);
           this.logger.warn({
             msg: 'Sent ALERT_ACTIVE to driver',
@@ -101,6 +104,24 @@ export class EmergencyService {
     if (failures.length > 0) {
       this.logger.error({ msg: 'Some driver notifications failed', failureCount: failures.length });
     }
+
+    // When no drivers are connected (e.g. test alert before app opens), still cache emergency for
+    // display so the display URL shows the alert. Use default Tel Aviv coords to get a shelter.
+    if (matchedDrivers.length === 0 && this.showAllIsraelAlerts) {
+      const defaultLat = 32.08;
+      const defaultLng = 34.78;
+      const emergencyData = await this.shelterSelector.selectShelter(
+        defaultLat,
+        defaultLng,
+        alert.title,
+        alert.detectedAt.toISOString(),
+      );
+      if (emergencyData) {
+        await this.cacheEmergencyForDisplay('driver-1', emergencyData);
+        await this.cacheEmergencyForDisplay('sim-driver-1', emergencyData);
+        this.logger.log({ msg: 'Cached emergency for display (no drivers connected)' });
+      }
+    }
   }
 
   @OnEvent(ALERT_CLEAR_EVENT)
@@ -111,6 +132,32 @@ export class EmergencyService {
     await this.alertStateRepo.clear();
     this.gateway.broadcastClear();
     await this.clearDisplayLastCache();
+  }
+
+  /**
+   * Cache emergency as the "last" instruction for the display URL so
+   * GET /ad-selection/last/:driverId returns the alert and the display page shows it.
+   */
+  private async cacheEmergencyForDisplay(driverId: string, data: EmergencyData): Promise<void> {
+    const client = this.redis?.getClient() as { setex(key: string, ttl: number, value: string): Promise<unknown> } | null;
+    if (!client) return;
+    const instruction = {
+      campaignId: 'emergency',
+      creativeId: `pikud-${Date.now()}`,
+      headline: data.alertHeadline,
+      body: `מקלט: ${data.shelterAddress} (${data.distanceMeters}m)`,
+      direction: data.direction,
+      distanceMeters: data.distanceMeters,
+      couponCode: '',
+      businessId: 'emergency',
+    };
+    const key = `${DISPLAY_LAST_KEY_PREFIX}${driverId}`;
+    try {
+      await client.setex(key, DISPLAY_LAST_TTL_SEC, JSON.stringify({ instructions: [instruction] }));
+      this.logger.log({ driverId, msg: 'Cached emergency for display' });
+    } catch (e) {
+      this.logger.warn({ driverId, msg: 'Failed to cache emergency for display', error: e instanceof Error ? e.message : String(e) });
+    }
   }
 
   /** Clear display:last cache so the app stops showing the emergency as "From display (synced)". */

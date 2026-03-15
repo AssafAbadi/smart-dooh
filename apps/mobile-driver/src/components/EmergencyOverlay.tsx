@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { useEmergencyStore } from '../stores/emergencyStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getNearestCachedShelter } from '../services/shelterCache';
+import { openGoogleMapsNavigation } from '../services/navigationService';
 import { haversineMeters, bearingDegrees, bearingToDirection, relativeDirection, type DirectionArrow } from '@smart-dooh/shared-geo';
+
+const NAVIGATION_DELAY_MS = 2000;
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -20,6 +23,34 @@ export function EmergencyOverlay() {
   const [liveDistance, setLiveDistance] = useState<number | null>(null);
   const [liveDirection, setLiveDirection] = useState<DirectionArrow>('up');
   const [displayAddress, setDisplayAddress] = useState<string>('');
+  const navigationTriggeredRef = useRef(false);
+
+  // 2s after overlay is shown, open Google Maps driving navigation to shelter (once per alert).
+  // Depend only on shelter location (lat/lng), not the whole shelter object, so we don't re-run
+  // every second when updateShelterDistance() updates distance/bearing (new object ref).
+  const shelterNavLat = shelter?.lat ?? null;
+  const shelterNavLng = shelter?.lng ?? null;
+  useEffect(() => {
+    if (!isAlertActive || shelter == null || shelterNavLat == null || shelterNavLng == null) {
+      navigationTriggeredRef.current = false;
+      return;
+    }
+    if (navigationTriggeredRef.current) return;
+    const timeoutId = setTimeout(() => {
+      navigationTriggeredRef.current = true;
+      let navLat = shelterNavLat;
+      let navLng = shelterNavLng;
+      if (navLat === 0 && navLng === 0 && lat != null && lng != null) {
+        const cached = getNearestCachedShelter(lat, lng);
+        if (cached) {
+          navLat = cached.lat;
+          navLng = cached.lng;
+        }
+      }
+      openGoogleMapsNavigation(navLat, navLng);
+    }, NAVIGATION_DELAY_MS);
+    return () => clearTimeout(timeoutId);
+  }, [isAlertActive, shelterNavLat, shelterNavLng, lat, lng]);
 
   // Depend only on primitive values that identify the shelter location, not the whole
   // shelter object. Otherwise updateShelterDistance() would change shelter reference

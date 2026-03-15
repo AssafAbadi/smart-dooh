@@ -83,12 +83,29 @@ export class AdSelectionController {
   }
 
   private async cacheLastForDisplay(driverId: string, result: { instructions: unknown[] }): Promise<void> {
-    const client = this.redis.getClient() as { setex(key: string, ttl: number, value: string): Promise<unknown> } | null;
+    const client = this.redis.getClient() as { get(key: string): Promise<string | null>; setex(key: string, ttl: number, value: string): Promise<unknown> } | null;
     if (!client) {
       this.logger.warn({ driverId, msg: 'Cannot cache for display: Redis client is null. Set REDIS_URL and ensure Redis is running.' });
       return;
     }
     const key = `${DISPLAY_LAST_KEY_PREFIX}${driverId}`;
+    // Do not overwrite display cache when it is currently showing emergency – ranked would replace alert with a business ad.
+    const firstNew = result.instructions?.[0] as { campaignId?: string } | undefined;
+    if (firstNew?.campaignId !== 'emergency') {
+      const raw = await client.get(key);
+      if (raw) {
+        try {
+          const existing = JSON.parse(raw) as { instructions?: Array<{ campaignId?: string }> };
+          const firstExisting = existing.instructions?.[0];
+          if (firstExisting?.campaignId === 'emergency') {
+            this.logger.log({ driverId, msg: 'Display last: keep emergency, skip overwrite from ranked' });
+            return;
+          }
+        } catch {
+          // ignore parse error, proceed to cache
+        }
+      }
+    }
     await client.setex(key, DISPLAY_LAST_TTL_SEC, JSON.stringify(result));
     this.logger.log({ driverId, instructionsCount: result.instructions?.length ?? 0, msg: 'Cached last for display' });
   }

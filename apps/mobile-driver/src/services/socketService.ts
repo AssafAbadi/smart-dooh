@@ -8,6 +8,8 @@ import { emergencyDataSchema, emergencyCheckResultSchema } from '@smart-dooh/sha
 const API_BASE = getApiBase();
 const FALLBACK_POLL_INTERVAL_MS = 2000;
 const DISCONNECT_THRESHOLD_MS = 3000;
+/** Ignore new ALERT_ACTIVE for this long after an alert was set to avoid flicker and redundant navigation. */
+const ALERT_THROTTLE_MS = 60_000;
 
 let socket: Socket | null = null;
 let fallbackInterval: ReturnType<typeof setInterval> | null = null;
@@ -23,8 +25,12 @@ function handleAlertActive(data: unknown): void {
     return;
   }
   const d = parsed.data;
-  logger.warn('ALERT_ACTIVE received via socket', { shelter: d.shelterAddress });
   const store = useEmergencyStore.getState();
+  if (store.isAlertActive && store.alertTimestamp != null && Date.now() - store.alertTimestamp < ALERT_THROTTLE_MS) {
+    logger.debug('ALERT_ACTIVE throttled (within 60s of last alert)');
+    return;
+  }
+  logger.warn('ALERT_ACTIVE received via socket', { shelter: d.shelterAddress });
   store.setAlert(
     {
       address: d.shelterAddress,
@@ -141,19 +147,19 @@ function startFallbackPolling(): void {
       const store = useEmergencyStore.getState();
 
       if (data.active && data.shelter) {
-        if (!store.isAlertActive) {
-          store.setAlert(
-            {
-              address: data.shelter.address,
-              lat: data.shelter.lat,
-              lng: data.shelter.lng,
-              distanceMeters: data.shelter.distanceMeters,
-              bearingDegrees: data.shelter.bearingDegrees,
-              direction: data.shelter.direction,
-            },
-            data.alert.headline,
-          );
-        }
+        const withinThrottle = store.isAlertActive && store.alertTimestamp != null && Date.now() - store.alertTimestamp < ALERT_THROTTLE_MS;
+        if (withinThrottle) return;
+        store.setAlert(
+          {
+            address: data.shelter.address,
+            lat: data.shelter.lat,
+            lng: data.shelter.lng,
+            distanceMeters: data.shelter.distanceMeters,
+            bearingDegrees: data.shelter.bearingDegrees,
+            direction: data.shelter.direction,
+          },
+          data.alert.headline,
+        );
       } else if (!data.active && store.isAlertActive) {
         store.clearAlert();
       }

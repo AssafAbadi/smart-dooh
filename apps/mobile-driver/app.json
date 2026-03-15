@@ -18,7 +18,8 @@
         "NSLocationAlwaysUsageDescription": "Adrive needs location to update ads on your car-top display.",
         "NSBluetoothAlwaysUsageDescription": "Adrive uses Bluetooth to detect nearby devices for ad metrics.",
         "UIBackgroundModes": ["location"],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["google.navigation", "comgooglemaps"]
       }
     },
     "android": {
