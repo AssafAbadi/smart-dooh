@@ -152,13 +152,13 @@ export function getDisplayHtml(driverId: string): string {
           '<div class="emergency-bottomBand"><div class="emergency-bottomText">Stay safe. Move to shelter immediately.</div></div>';
         return;
       }
-      const headlineRaw = replacePlaceholders(instruction.headline || 'Special offer', instruction, false);
-      const bodyRaw = replacePlaceholders(instruction.body || '', instruction, true);
-      const headline = escapeHtml(headlineRaw);
-      const bodyEscaped = escapeHtml(bodyRaw);
-      const coupon = escapeHtml(instruction.couponCode || '');
-      var arrowChar = instruction.direction && DIRECTION_ARROWS[instruction.direction] ? DIRECTION_ARROWS[instruction.direction] : '';
-      var arrowBlock = arrowChar ? '<div class="direction-arrow">' + escapeHtml(arrowChar) + '</div>' : '';
+      var headlineRawAd = replacePlaceholders(instruction.headline || 'Special offer', instruction, false);
+      var bodyRawAd = replacePlaceholders(instruction.body || '', instruction, true);
+      var headline = escapeHtml(headlineRawAd);
+      var bodyEscaped = escapeHtml(bodyRawAd);
+      var coupon = escapeHtml(instruction.couponCode || '');
+      var arrowCharAd = instruction.direction && DIRECTION_ARROWS[instruction.direction] ? DIRECTION_ARROWS[instruction.direction] : '';
+      var arrowBlock = arrowCharAd ? '<div class="direction-arrow">' + escapeHtml(arrowCharAd) + '</div>' : '';
       root.innerHTML = '<div class="headline">' + headline + '</div><div class="body">' + bodyEscaped + '</div>' + arrowBlock + (coupon ? '<div class="coupon">' + coupon + '</div>' : '');
     }
 
@@ -178,7 +178,7 @@ export function getDisplayHtml(driverId: string): string {
           root.innerHTML = '<div class="headline">Connecting…</div><div class="body">No response yet. Open the app with this driver or check the server. Retrying every 5s.</div>';
         }
       }, fetchTimeout);
-      fetch(API_BASE + '/ad-selection/last/' + encodeURIComponent(driverId), { headers: headers })
+      fetch(API_BASE + '/ad-selection/last/' + encodeURIComponent(driverId) + '?t=' + Date.now(), { headers: headers })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(data) {
           clearTimeout(timeoutId);

@@ -15,6 +15,7 @@ export class DisplayController {
   @ApiParam({ name: 'driverId', example: 'driver-1' })
   async getDisplay(@Param('driverId') driverId: string, @Res() res: FastifyReply) {
     const html = getDisplayHtml(driverId);
+    res.header('Cache-Control', 'no-store');
     res.type('text/html').send(html);
   }
 }
