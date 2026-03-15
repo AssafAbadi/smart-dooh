@@ -162,7 +162,8 @@ export function BackgroundDriverLogic() {
     const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
     const url = `${API_BASE}/ad-selection/ranked?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&geohash=${geohash}&timeHour=${new Date().getHours()}`;
     logger.info('Ranked request', { lat, lng, geohash });
-    const RANKED_FETCH_TIMEOUT_MS = 15000;
+    /** Longer timeout so ngrok/slow networks can complete; backend must cache result for display page to show same ad. */
+    const RANKED_FETCH_TIMEOUT_MS = 30000;
     const ac = new AbortController();
     const timeoutId = setTimeout(() => ac.abort(), RANKED_FETCH_TIMEOUT_MS);
     fetch(url, { headers: apiHeaders({ 'x-device-id': deviceId }), signal: ac.signal })
@@ -247,6 +248,7 @@ export function BackgroundDriverLogic() {
         if (e?.name === 'AbortError') {
           logger.warn('Ad-selection ranked timeout (e.g. on cellular) – will retry next poll');
           lastAdFetchTimeRef.current = 0;
+          return;
         }
         logger.error('Ad-selection ranked error', e);
       });

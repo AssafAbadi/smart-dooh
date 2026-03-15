@@ -127,7 +127,9 @@ export function getDisplayHtml(driverId: string): string {
         lastAdKey = '';
         return;
       }
-      var isEmergency = instruction.campaignId === 'emergency';
+      var isEmergency = instruction.campaignId === 'emergency' ||
+        (instruction.body && String(instruction.body).indexOf('מקלט') !== -1) ||
+        (instruction.headline && /אזעקת|MISSILE|alert/i.test(String(instruction.headline)));
       document.body.classList.toggle('emergency', isEmergency);
       if (useFade) {
         root.classList.remove('fade-enter');
@@ -160,12 +162,27 @@ export function getDisplayHtml(driverId: string): string {
       root.innerHTML = '<div class="headline">' + headline + '</div><div class="body">' + bodyEscaped + '</div>' + arrowBlock + (coupon ? '<div class="coupon">' + coupon + '</div>' : '');
     }
 
+    var fetchTimeout = 12000;
+
+    function showMirror() {
+      root.innerHTML = '<div class="headline">Mirror</div><div class="body">Open the app with this driver. The ad shown in the app will appear here within a few seconds.</div>';
+    }
+
     function fetchAds() {
       var headers = { 'Accept': 'application/json' };
       if (window.location.hostname.indexOf('ngrok') !== -1) headers['ngrok-skip-browser-warning'] = '1';
+      var timedOut = false;
+      var timeoutId = setTimeout(function() {
+        timedOut = true;
+        if (lastAdKey === '') {
+          root.innerHTML = '<div class="headline">Connecting…</div><div class="body">No response yet. Open the app with this driver or check the server. Retrying every 5s.</div>';
+        }
+      }, fetchTimeout);
       fetch(API_BASE + '/ad-selection/last/' + encodeURIComponent(driverId), { headers: headers })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(data) {
+          clearTimeout(timeoutId);
+          if (timedOut) return;
           var first = data && data.instructions && data.instructions[0];
           if (first) {
             emptyCount = 0;
@@ -179,14 +196,15 @@ export function getDisplayHtml(driverId: string): string {
               if (emptyCount >= 2) {
                 lastAdKey = '';
                 emptyCount = 0;
-                root.innerHTML = '<div class="headline">Mirror</div><div class="body">Open the app with this driver. The ad shown in the app will appear here within a few seconds.</div>';
+                showMirror();
               }
             } else {
-              root.innerHTML = '<div class="headline">Mirror</div><div class="body">Open the app with this driver. The ad shown in the app will appear here within a few seconds.</div>';
+              showMirror();
             }
           }
         })
         .catch(function() {
+          clearTimeout(timeoutId);
           if (!lastAdKey) {
             root.innerHTML = '<div class="headline">Offline</div><div class="body">Cannot reach server. Retrying in 5s.</div>';
           }

@@ -17,9 +17,20 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Adrive uses background location to serve relevant ads while driving.",
         "NSLocationAlwaysUsageDescription": "Adrive needs location to update ads on your car-top display.",
         "NSBluetoothAlwaysUsageDescription": "Adrive uses Bluetooth to detect nearby devices for ad metrics.",
-        "UIBackgroundModes": ["location"],
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ],
         "ITSAppUsesNonExemptEncryption": false,
-        "LSApplicationQueriesSchemes": ["google.navigation", "comgooglemaps"]
+        "LSApplicationQueriesSchemes": [
+          "google.navigation",
+          "comgooglemaps",
+          "google.navigation",
+          "comgooglemaps"
+        ]
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -34,8 +45,19 @@
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "BLUETOOTH",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "runtimeVersion": "1.0.0"
     },
     "plugins": [
       "expo-router",
@@ -59,6 +81,9 @@
       "eas": {
         "projectId": "e6d100b4-917b-4c69-be57-1ab64fb100aa"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e6d100b4-917b-4c69-be57-1ab64fb100aa"
     }
   }
 }
