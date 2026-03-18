@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   coupon: {
-    color: colors.industrialRed,
+    color: colors.accent,
     fontSize: 12,
     fontFamily: 'monospace',
   },

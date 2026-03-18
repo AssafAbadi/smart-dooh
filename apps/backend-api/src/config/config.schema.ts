@@ -23,6 +23,12 @@ export const envSchema = z.object({
   EMERGENCY_MODULE_ENABLED: z.string().optional(),
   EMERGENCY_SHOW_ALL_ISRAEL_ALERTS: z.string().optional(),
   SHELTER_SEARCH_RADIUS_M: z.string().optional(),
+  JWT_SECRET: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

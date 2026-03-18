@@ -25,10 +25,14 @@ import { DriverModule } from './driver/driver.module';
 import { ShelterModule } from './shelter/shelter.module';
 import { EmergencyModule } from './emergency/emergency.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
+import { MailModule } from './mail/mail.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule,
+    MailModule,
+    AuthModule,
     TimeModule,
     LoggerModule.forRootAsync({
       useFactory: (config: ConfigService) => ({

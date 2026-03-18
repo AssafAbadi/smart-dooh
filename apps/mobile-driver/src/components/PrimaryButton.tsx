@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primary: {
-    backgroundColor: colors.industrialRed,
+    backgroundColor: colors.accent,
   },
   secondary: {
     backgroundColor: colors.surface,

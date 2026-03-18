@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Linking, Pressable, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocationStore } from '../../src/stores/locationStore';
 import { useAdStore } from '../../src/stores/adStore';
 import { useSimulatorStore, SIMULATOR_DRIVER_ID } from '../../src/stores/simulatorStore';
-import { useDriverBalance } from '../../src/hooks/useDriverBalance';
+import { useDriverDailyEarnings } from '../../src/hooks/useDriverEarnings';
+import { useAuthDriverId } from '../../src/hooks/useAuthDriverId';
 import { AdSlot } from '../../src/components/AdSlot';
 import { colors } from '../../src/theme/colors';
-import { getApiBase, apiHeaders } from '../../src/services/apiClient';
+import * as SecureStore from 'expo-secure-store';
+import { getApiBase, apiHeaders, authHeaders, getAuthTokenKey } from '../../src/services/apiClient';
 
 const DEFAULT_DRIVER_ID = 'driver-1';
 const LIVE_DISTANCE_INTERVAL_MS = 5000;
@@ -102,8 +104,9 @@ function distanceWithDirection(
 export default function HomeScreen() {
   const { lat, lng, isSimulated, heading } = useLocationStore();
   const { simulatorMode } = useSimulatorStore();
-  const driverId = simulatorMode ? SIMULATOR_DRIVER_ID : DEFAULT_DRIVER_ID;
-  const { balance, refetch } = useDriverBalance(driverId);
+  const authDriverId = useAuthDriverId();
+  const driverId = simulatorMode ? SIMULATOR_DRIVER_ID : (authDriverId ?? DEFAULT_DRIVER_ID);
+  const { earnings: dailyEarnings, refetch } = useDriverDailyEarnings(driverId);
 
   useFocusEffect(
     useCallback(() => {
@@ -165,7 +168,10 @@ export default function HomeScreen() {
     return () => clearInterval(id);
   }, [lat, lng, instructions]);
 
-  // Sync the phone's relative direction to the backend so the display URL mirrors it
+  const authTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    SecureStore.getItemAsync(getAuthTokenKey()).then((t) => { authTokenRef.current = t; });
+  }, []);
   const lastSyncedDir = useRef<string | null>(null);
   useEffect(() => {
     function syncDirection() {
@@ -177,16 +183,27 @@ export default function HomeScreen() {
       const dir = relativeDirection(la, ln, inst.businessLat, inst.businessLng, h);
       if (dir === lastSyncedDir.current) return;
       lastSyncedDir.current = dir;
-      fetch(`${getApiBase()}/ad-selection/direction/${encodeURIComponent(driverId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
-        body: JSON.stringify({ direction: dir }),
-      }).catch(() => {});
+      if (simulatorMode) {
+        fetch(`${getApiBase()}/ad-selection/direction/${encodeURIComponent(driverId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+          body: JSON.stringify({ direction: dir }),
+        }).catch(() => {});
+      } else {
+        const token = authTokenRef.current;
+        if (token) {
+          fetch(`${getApiBase()}/ad-selection/me/direction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+            body: JSON.stringify({ direction: dir }),
+          }).catch(() => {});
+        }
+      }
     }
     const id = setInterval(syncDirection, DIRECTION_SYNC_INTERVAL_MS);
     syncDirection();
     return () => clearInterval(id);
-  }, [driverId, instructions]);
+  }, [driverId, instructions, simulatorMode]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -212,12 +229,34 @@ export default function HomeScreen() {
         </View>
       </View>
       <View style={styles.card}>
-        <Text style={styles.label}>Current balance</Text>
+        <Text style={styles.label}>Today&apos;s balance</Text>
         <Text style={styles.amount}>
-          {balance != null ? `₪${balance.toFixed(2)}` : '—'}
+          {dailyEarnings != null ? `₪${dailyEarnings.toFixed(2)}` : '—'}
         </Text>
-        <Text style={styles.hint}>Payouts and history in Earnings & Payments</Text>
+        <Text style={styles.hint}>Payouts and total earnings in Earnings & Payments</Text>
       </View>
+      {driverId ? (
+        <View style={styles.card}>
+          <Text style={styles.label}>Your display (billboard) URL</Text>
+          <Text style={styles.hint}>Open this link on a TV, tablet, or browser to show the same ad as here. Uses your account.</Text>
+          <Pressable
+            style={({ pressed }) => [styles.displayUrlWrap, pressed && styles.displayUrlPressed]}
+            onPress={() => {
+              const url = `${getApiBase()}/display/${encodeURIComponent(driverId)}`;
+              if (Platform.OS === 'web') {
+                window.open(url, '_blank');
+              } else {
+                Linking.openURL(url);
+              }
+            }}
+          >
+            <Text style={styles.displayUrl} numberOfLines={2} selectable>
+              {`${getApiBase()}/display/${driverId}`}
+            </Text>
+            <Text style={styles.displayUrlAction}>Tap to open in browser</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -273,6 +312,27 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   slotWrap: {
+    marginTop: 4,
+  },
+  displayUrlWrap: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  displayUrlPressed: {
+    opacity: 0.8,
+  },
+  displayUrl: {
+    color: colors.primary,
+    fontSize: 13,
+  },
+  displayUrlAction: {
+    color: colors.textMuted,
+    fontSize: 11,
     marginTop: 4,
   },
 });

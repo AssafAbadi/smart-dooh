@@ -1,7 +1,14 @@
 import { Body, Controller, Get, Inject, Logger, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
-import { rankedQuerySchema, type RankedQueryDto } from '@smart-dooh/shared-dto';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  rankedQuerySchema,
+  rankedQueryAuthSchema,
+  type RankedQueryDto,
+  type RankedQueryAuthDto,
+} from '@smart-dooh/shared-dto';
 import { selectBodySchema, type SelectBodyDto } from '@smart-dooh/shared-dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentDriverId } from '../auth/decorators/current-driver-id.decorator';
 import { TOKENS } from '../core/constants/tokens';
 import type { IRedisService } from '../core/interfaces/redis.interface';
 import { ZodValidationPipe } from '../core/pipes/zod-validation.pipe';
@@ -33,7 +40,7 @@ export class AdSelectionController {
   ) {}
 
   @Get('ranked')
-  @ApiOperation({ summary: 'Get ranked ad instructions by driver and location' })
+  @ApiOperation({ summary: 'Get ranked ad instructions by driver and location (query.driverId)' })
   async getRanked(
     @Query(new ZodValidationPipe(rankedQuerySchema)) query: RankedQueryDto,
     @Query('debug') debug?: string,
@@ -43,6 +50,68 @@ export class AdSelectionController {
     this.logger.log({ driverId: query.driverId, instructionsCount: result.instructions?.length ?? 0, msg: 'GET ranked' });
     if (debug === '1') return result;
     return { instructions: this.mapper.toPublicList(result.instructions) };
+  }
+
+  @Get('me/ranked')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get ranked ad instructions for authenticated driver' })
+  async getRankedMe(
+    @CurrentDriverId() driverId: string,
+    @Query(new ZodValidationPipe(rankedQueryAuthSchema)) query: RankedQueryAuthDto,
+    @Query('debug') debug?: string,
+  ) {
+    const fullQuery: RankedQueryDto = { ...query, driverId };
+    const result = await this.facade.getRanked(fullQuery);
+    if ((result.instructions?.length ?? 0) > 0) await this.cacheLastForDisplay(driverId, result);
+    this.logger.log({ driverId, instructionsCount: result.instructions?.length ?? 0, msg: 'GET me/ranked' });
+    if (debug === '1') return result;
+    return { instructions: this.mapper.toPublicList(result.instructions) };
+  }
+
+  @Get('me/last')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Last ranked result for authenticated driver' })
+  async getLastMe(@CurrentDriverId() driverId: string) {
+    const client = this.redis.getClient() as { get(key: string): Promise<string | null> } | null;
+    if (!client) {
+      this.logger.warn({ driverId, msg: 'me/last: Redis client is null. Return empty.' });
+      return { instructions: [] };
+    }
+    const key = `${DISPLAY_LAST_KEY_PREFIX}${driverId}`;
+    const raw = await client.get(key);
+    if (!raw) {
+      this.logger.log({ driverId, msg: 'me/last: cache miss. Return empty.' });
+      return { instructions: [] };
+    }
+    try {
+      const data = JSON.parse(raw) as { instructions: Array<{ direction?: string; [k: string]: unknown }> };
+      const phoneDir = await client.get(`${DISPLAY_DIRECTION_KEY_PREFIX}${driverId}`);
+      if (phoneDir && data.instructions?.length) {
+        data.instructions = data.instructions.map((inst) => ({ ...inst, direction: phoneDir }));
+      }
+      return data;
+    } catch {
+      return { instructions: [] };
+    }
+  }
+
+  @Post('me/direction')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Phone sends direction for display sync (authenticated)' })
+  async postDirectionMe(
+    @CurrentDriverId() driverId: string,
+    @Body() body: { direction: string },
+  ) {
+    const valid = ['up', 'down', 'left', 'right'];
+    const dir = body?.direction;
+    if (!dir || !valid.includes(dir)) return { ok: false };
+    const client = this.redis.getClient() as { setex(key: string, ttl: number, value: string): Promise<unknown> } | null;
+    if (!client) return { ok: false };
+    await client.setex(`${DISPLAY_DIRECTION_KEY_PREFIX}${driverId}`, DISPLAY_DIRECTION_TTL_SEC, dir);
+    return { ok: true };
   }
 
   @Get('ranked/:driverId')

@@ -3,25 +3,30 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '../src/theme/colors';
-
-const AUTH_TOKEN_KEY = 'adrive_auth_token';
+import { getAuthTokenKey } from '../src/services/apiClient';
+import { decodeJwtPayload } from '../src/services/authHelpers';
 
 export default function IndexScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    SecureStore.getItemAsync(AUTH_TOKEN_KEY).then((token) => {
-      if (token) {
-        router.replace('/(drawer)');
-      } else {
+    SecureStore.getItemAsync(getAuthTokenKey()).then((token) => {
+      if (!token) {
         router.replace('/(auth)/login');
+        return;
       }
+      const payload = decodeJwtPayload(token);
+      if (payload?.isVerified === false) {
+        router.replace('/(auth)/email-verification');
+        return;
+      }
+      router.replace('/(drawer)');
     });
   }, [router]);
 
   return (
     <View style={styles.centered}>
-      <ActivityIndicator size="large" color={colors.industrialRed} />
+      <ActivityIndicator size="large" color={colors.accent} />
     </View>
   );
 }

@@ -1,7 +1,14 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { contextQuerySchema, type ContextQueryDto } from '@smart-dooh/shared-dto';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  contextQuerySchema,
+  contextQueryAuthSchema,
+  type ContextQueryDto,
+  type ContextQueryAuthDto,
+} from '@smart-dooh/shared-dto';
 import { driverPreferencesUpdateSchema, type DriverPreferencesUpdateDto } from '@smart-dooh/shared-dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentDriverId } from '../auth/decorators/current-driver-id.decorator';
 import { ZodValidationPipe } from '../core/pipes/zod-validation.pipe';
 import { ContextEngineService } from './context-engine.service';
 import { DeviceRateLimitGuard } from '../rate-limit/guards/device-rate-limit.guard';
@@ -140,6 +147,70 @@ export class ContextEngineController {
     const { driverId, deviceId, lat, lng, geohash } = query;
     const result = await this.contextEngine.getContextWithIntegrations(driverId, deviceId, lat, lng, geohash);
     this.logger.log({ driverId, businessesCount: result.businesses.length, poisCount: result.pois.length, msg: 'GET context' });
+    return result;
+  }
+
+  @Get('me/businesses')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get businesses filtered by authenticated driver preferences' })
+  async getFilteredBusinessesMe(@CurrentDriverId() driverId: string) {
+    const businesses = await this.contextEngine.getFilteredBusinessesForDriver(driverId);
+    this.logger.log({ driverId, businessesCount: businesses.length, msg: 'GET me/businesses' });
+    return { businesses };
+  }
+
+  @Get('me/driver-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get authenticated driver preferences' })
+  async getDriverPreferencesMe(@CurrentDriverId() driverId: string) {
+    const prefs = await this.contextEngine.getDriverPreferences(driverId);
+    const tags = prefs?.preference_tags ?? [];
+    this.logger.log({ driverId, preference_tags: tags, msg: 'GET me/driver-preferences' });
+    return { preferences: prefs ?? defaultDriverPreferences() };
+  }
+
+  @Patch('me/driver-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update authenticated driver preferences' })
+  async updateDriverPreferencesMe(
+    @CurrentDriverId() driverId: string,
+    @Body() rawBody: unknown,
+  ) {
+    const body = parseDriverPreferencesBody(rawBody);
+    const prefs = await this.contextEngine.updateDriverPreferences(driverId, body);
+    this.logger.log({ driverId, preference_tags: prefs.preference_tags, msg: 'PATCH me/driver-preferences OK' });
+    return { preferences: prefs };
+  }
+
+  @Post('me/driver-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async updateDriverPreferencesPostMe(
+    @CurrentDriverId() driverId: string,
+    @Body() rawBody: unknown,
+  ) {
+    const body = parseDriverPreferencesBody(rawBody);
+    const prefs = await this.contextEngine.updateDriverPreferences(driverId, body);
+    this.logger.log({ driverId, preference_tags: prefs.preference_tags, msg: 'POST me/driver-preferences OK' });
+    return { preferences: prefs };
+  }
+
+  @Get('me/context')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get full context for authenticated driver' })
+  async getContextMe(
+    @CurrentDriverId() driverId: string,
+    @Query(new ZodValidationPipe(contextQueryAuthSchema)) query: ContextQueryAuthDto,
+  ) {
+    const { deviceId, lat, lng, geohash } = query;
+    const result = await this.contextEngine.getContextWithIntegrations(driverId, deviceId, lat, lng, geohash);
+    this.logger.log({ driverId, businessesCount: result.businesses.length, poisCount: result.pois.length, msg: 'GET me/context' });
     return result;
   }
 }

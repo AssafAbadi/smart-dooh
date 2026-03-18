@@ -19,8 +19,25 @@ export function getApiBase(): string {
 /** Default headers for API requests. Include these so ngrok forwards to the backend on cellular. */
 export function apiHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
     ...(isNgrok ? { 'ngrok-skip-browser-warning': '1' } : {}),
     ...extra,
   };
   return headers;
+}
+
+const AUTH_TOKEN_KEY = 'adrive_auth_token';
+
+/** Get stored auth token key name (for SecureStore). */
+export function getAuthTokenKey(): string {
+  return AUTH_TOKEN_KEY;
+}
+
+/** Build headers with optional Bearer token. Caller should pass token from SecureStore when needed. */
+export function authHeaders(token: string | null): Record<string, string> {
+  const h = apiHeaders();
+  if (token) {
+    h['Authorization'] = `Bearer ${token}`;
+  }
+  return h;
 }

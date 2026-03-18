@@ -27,14 +27,53 @@ enum PreferenceFilter {
   NO_GAMBLING
 }
 
+/// OTP purpose: signup email verification or password reset.
+enum OtpPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
 model Driver {
   id         String             @id @default(uuid())
   balance   Float              @default(0) // ILS, updated in real-time per estimated impression
   pushToken String?            // Expo push token for remote notifications
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
+  auth       DriverAuth?
   preferences DriverPreferences?
   carScreens CarScreen[]
+}
+
+/// 1:1 driver identity for email+password auth. JWT sub = driverAuthId; driverId in token for scoping.
+model DriverAuth {
+  id           String    @id @default(uuid())
+  driverId     String    @unique
+  driver       Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  email        String    @unique
+  passwordHash String
+  isVerified   Boolean   @default(false)
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  otpCodes     OtpCode[]
+
+  @@index([email])
+}
+
+/// 6-digit OTP for verify-email or reset-password. Stored hashed; single-use, time-limited.
+model OtpCode {
+  id           String    @id @default(uuid())
+  driverAuthId String
+  driverAuth   DriverAuth @relation(fields: [driverAuthId], references: [id], onDelete: Cascade)
+  purpose      OtpPurpose
+  codeHash     String
+  expiresAt    DateTime
+  isUsed       Boolean   @default(false)
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([driverAuthId, purpose, createdAt])
+  @@index([expiresAt])
 }
 
 model DriverPreferences {

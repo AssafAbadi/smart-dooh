@@ -1,7 +1,18 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { colors } from '../../src/theme/colors';
+import { getAuthTokenKey } from '../../src/services/apiClient';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 
 export default function AccountScreen() {
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await SecureStore.deleteItemAsync(getAuthTokenKey());
+    router.replace('/(auth)/login');
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <View style={styles.card}>
@@ -13,6 +24,9 @@ export default function AccountScreen() {
         <Text style={styles.label}>Vehicle</Text>
         <Text style={styles.value}>—</Text>
         <Text style={styles.hint}>Vehicle info and documents.</Text>
+      </View>
+      <View style={styles.card}>
+        <PrimaryButton title="Sign out" variant="secondary" onPress={handleSignOut} />
       </View>
     </ScrollView>
   );

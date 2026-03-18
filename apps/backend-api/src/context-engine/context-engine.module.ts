@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TOKENS } from '../core/constants/tokens';
+import { AuthModule } from '../auth/auth.module';
 import { BusinessRepository } from '../business/repositories/business.repository';
 import { DriverPreferencesRepository } from '../business/repositories/driver-preferences.repository';
 import { ExternalApiModule } from '../external-api/external-api.module';
@@ -9,7 +10,7 @@ import { ContextEngineController } from './context-engine.controller';
 import { ContextEngineService } from './context-engine.service';
 
 @Module({
-  imports: [ExternalApiModule, RateLimitModule, RedisModule],
+  imports: [AuthModule, ExternalApiModule, RateLimitModule, RedisModule],
   controllers: [ContextEngineController],
   providers: [
     ContextEngineService,

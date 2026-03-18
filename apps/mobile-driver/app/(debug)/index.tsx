@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   sectionLabel: {
-    color: colors.industrialRed,
+    color: colors.accent,
     fontSize: 12,
     marginBottom: 8,
   },
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 100,
     borderWidth: 3,
-    borderColor: colors.industrialRed,
+    borderColor: colors.accent,
     borderRadius: 4,
     backgroundColor: 'transparent',
   },
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   bar: {
     width: 24,
     height: 60,
-    backgroundColor: colors.industrialRed,
+    backgroundColor: colors.accent,
     borderRadius: 4,
   },
   barShort: {

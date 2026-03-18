@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { getApiBase, apiHeaders } from './apiClient';
+import { getApiBase, apiHeaders, authHeaders } from './apiClient';
 import { logger } from '../utils/logger';
 
 /**
@@ -77,26 +77,26 @@ export async function getExpoPushTokenAsync(): Promise<string | null> {
 }
 
 /**
- * Register the current device's push token with the backend for the given driver.
- * Idempotent: safe to call on every app open. No-op if permissions denied or token unavailable.
+ * Register the current device's push token with the backend for the authenticated driver.
+ * Idempotent: safe to call on every app open. No-op if permissions denied, token unavailable, or not logged in.
  */
-export async function registerPushToken(driverId: string): Promise<void> {
-  const token = await getExpoPushTokenAsync();
-  if (!token) return;
+export async function registerPushToken(authToken: string | null): Promise<void> {
+  const pushToken = await getExpoPushTokenAsync();
+  if (!pushToken || !authToken) return;
 
   const apiBase = getApiBase();
   const url = `${apiBase.replace(/\/$/, '')}/drivers/push-token`;
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ driverId, pushToken: token }),
+      headers: authHeaders(authToken),
+      body: JSON.stringify({ pushToken }),
     });
     if (!res.ok) {
-      logger.warn('Push token registration failed', { status: res.status, driverId });
+      logger.warn('Push token registration failed', { status: res.status });
       return;
     }
-    logger.info('Push token registered', { driverId });
+    logger.info('Push token registered');
   } catch (e) {
     logger.error('Push token registration request failed', e);
   }

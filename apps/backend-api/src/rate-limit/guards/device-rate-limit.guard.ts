@@ -24,7 +24,7 @@ export class DeviceRateLimitGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<FastifyRequest>();
     const reply = context.switchToHttp().getResponse<FastifyReply>();
     const url = request.url?.split('?')[0] ?? '';
-    if (url.includes('/driver-preferences/')) return true;
+    if (url.includes('driver-preferences')) return true;
     if (url.includes('/ad-selection/last/')) return true;
     const deviceId =
       (request.headers['x-device-id'] as string) ||

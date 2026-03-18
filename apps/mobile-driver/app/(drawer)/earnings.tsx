@@ -2,15 +2,17 @@ import { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSimulatorStore, SIMULATOR_DRIVER_ID } from '../../src/stores/simulatorStore';
-import { useDriverBalance } from '../../src/hooks/useDriverBalance';
+import { useAuthDriverId } from '../../src/hooks/useAuthDriverId';
+import { useDriverTotalEarnings } from '../../src/hooks/useDriverEarnings';
 import { colors } from '../../src/theme/colors';
 
 const DEFAULT_DRIVER_ID = 'driver-1';
 
 export default function EarningsScreen() {
   const { simulatorMode } = useSimulatorStore();
-  const driverId = simulatorMode ? SIMULATOR_DRIVER_ID : DEFAULT_DRIVER_ID;
-  const { balance, loading, error, refetch } = useDriverBalance(driverId);
+  const authDriverId = useAuthDriverId();
+  const driverId = simulatorMode ? SIMULATOR_DRIVER_ID : (authDriverId ?? DEFAULT_DRIVER_ID);
+  const { earnings: totalEarnings, loading, error, refetch } = useDriverTotalEarnings(driverId);
 
   useFocusEffect(
     useCallback(() => {
@@ -21,10 +23,11 @@ export default function EarningsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <View style={styles.card}>
-        <Text style={styles.label}>Current balance</Text>
+        <Text style={styles.label}>Total earnings</Text>
         <Text style={styles.amount}>
-          {loading ? '…' : error ? error : balance != null ? `₪${balance.toFixed(2)}` : '—'}
+          {loading ? '…' : error ? error : totalEarnings != null ? `₪${totalEarnings.toFixed(2)}` : '—'}
         </Text>
+        <Text style={styles.hint}>All-time earnings from impressions</Text>
       </View>
       <View style={styles.card}>
         <Text style={styles.label}>Payout history</Text>
@@ -47,5 +50,5 @@ const styles = StyleSheet.create({
   },
   label: { color: colors.textMuted, fontSize: 12, marginBottom: 4 },
   amount: { color: colors.text, fontSize: 22, fontWeight: '600' },
-  hint: { color: colors.textMuted, fontSize: 12 },
+  hint: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
 });

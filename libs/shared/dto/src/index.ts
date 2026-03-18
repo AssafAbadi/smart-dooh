@@ -27,13 +27,17 @@ export {
 } from './record-impression.dto';
 export {
   rankedQuerySchema,
+  rankedQueryAuthSchema,
   rankedQuerySafeParse,
   type RankedQueryDto,
+  type RankedQueryAuthDto,
 } from './ranked-query.dto';
 export {
   contextQuerySchema,
+  contextQueryAuthSchema,
   contextQuerySafeParse,
   type ContextQueryDto,
+  type ContextQueryAuthDto,
 } from './context-query.dto';
 export {
   selectBodySchema,
@@ -102,3 +106,22 @@ export {
   registerPushTokenSafeParse,
   type RegisterPushTokenDto,
 } from './push-token.dto';
+export {
+  signupBodySchema,
+  loginBodySchema,
+  verifyEmailBodySchema,
+  forgotPasswordBodySchema,
+  resetPasswordBodySchema,
+  resendVerificationBodySchema,
+  signupBodySafeParse,
+  loginBodySafeParse,
+  verifyEmailBodySafeParse,
+  forgotPasswordBodySafeParse,
+  resetPasswordBodySafeParse,
+  type SignupBodyDto,
+  type LoginBodyDto,
+  type VerifyEmailBodyDto,
+  type ForgotPasswordBodyDto,
+  type ResetPasswordBodyDto,
+  type ResendVerificationBodyDto,
+} from './auth.dto';

@@ -20,7 +20,7 @@ function FilterRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.industrialRed }}
+        trackColor={{ false: colors.border, true: colors.accent }}
         thumbColor="#fff"
       />
     </View>
@@ -30,7 +30,10 @@ function FilterRow({
 export default function PreferencesScreen() {
   const { simulatorMode } = useSimulatorStore();
   const driverId = simulatorMode ? SIMULATOR_DRIVER_ID : 'driver-1';
-  const { preferences, loading, saving, saveError, updatePref, refetch } = useDriverPreferences(driverId, { syncToBothDrivers: true });
+  const { preferences, loading, saving, saveError, updatePref, refetch } = useDriverPreferences(driverId, {
+    syncToBothDrivers: true,
+    useMeApi: !simulatorMode,
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -71,7 +74,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   hint: { color: colors.textMuted, fontSize: 14, marginBottom: 16 },
-  error: { color: colors.industrialRed, fontSize: 13, marginBottom: 12 },
+  error: { color: colors.accent, fontSize: 13, marginBottom: 12 },
   filterBlock: { marginBottom: 24 },
   filterRow: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TOKENS } from '../core/constants/tokens';
+import { AuthModule } from '../auth/auth.module';
 import { RedisModule } from '../redis/redis.module';
 import { ContextEngineModule } from '../context-engine/context-engine.module';
 import { ExternalApiModule } from '../external-api/external-api.module';
@@ -33,7 +34,7 @@ import { AdInstructionMapper } from './mappers/ad-instruction.mapper';
 import { AdSelectionController } from './ad-selection.controller';
 
 @Module({
-  imports: [RedisModule, ContextEngineModule, ExternalApiModule, ImpressionEstimatorModule, ObservabilityModule, RateLimitModule, forwardRef(() => EmergencyModule), FraudGuardModule, TimeModule],
+  imports: [AuthModule, RedisModule, ContextEngineModule, ExternalApiModule, ImpressionEstimatorModule, ObservabilityModule, RateLimitModule, forwardRef(() => EmergencyModule), FraudGuardModule, TimeModule],
   controllers: [AdSelectionController],
   providers: [
     EmergencyAlertRepository,

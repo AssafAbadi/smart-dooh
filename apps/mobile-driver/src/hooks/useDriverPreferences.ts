@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { logger } from '../utils/logger';
 import { useAdStore } from '../stores/adStore';
-
-import { getApiBase, apiHeaders } from '../services/apiClient';
+import { getApiBase, apiHeaders, authHeaders, getAuthTokenKey } from '../services/apiClient';
 
 const API_BASE = getApiBase();
 
@@ -63,8 +63,9 @@ export interface ApiDriverPreferences {
   excludedLanguages: string[];
 }
 
-export function useDriverPreferences(driverId: string, options?: { syncToBothDrivers?: boolean }) {
+export function useDriverPreferences(driverId: string, options?: { syncToBothDrivers?: boolean; useMeApi?: boolean }) {
   const syncToBoth = options?.syncToBothDrivers ?? false;
+  const useMeApi = options?.useMeApi ?? false;
   const requestRefresh = useAdStore((s) => s.requestRefresh);
   const [preferences, setPreferences] = useState<DriverPreferences>(defaults);
   const [loading, setLoading] = useState(true);
@@ -72,6 +73,30 @@ export function useDriverPreferences(driverId: string, options?: { syncToBothDri
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchPrefs = useCallback(async () => {
+    if (useMeApi) {
+      setLoading(true);
+      setSaveError(null);
+      try {
+        const token = await SecureStore.getItemAsync(getAuthTokenKey());
+        if (!token) {
+          setPreferences(defaults);
+          return;
+        }
+        const res = await fetch(`${API_BASE}/context-engine/me/driver-preferences`, { headers: authHeaders(token) });
+        if (!res.ok) logger.warn('Driver preferences fetch failed', { status: res.status });
+        const data = (await res.json()) as { preferences: ApiDriverPreferences };
+        const p = data.preferences;
+        const tags = p?.preference_tags ?? [];
+        setPreferences(preferenceTagsToPrefs(tags));
+        logger.info('Driver preferences loaded', { preference_tags: tags });
+      } catch (e) {
+        logger.error('Driver preferences fetch error', e);
+        setPreferences(defaults);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (!driverId) return;
     setLoading(true);
     setSaveError(null);
@@ -89,7 +114,7 @@ export function useDriverPreferences(driverId: string, options?: { syncToBothDri
     } finally {
       setLoading(false);
     }
-  }, [driverId]);
+  }, [driverId, useMeApi]);
 
   useEffect(() => {
     fetchPrefs();
@@ -108,36 +133,51 @@ export function useDriverPreferences(driverId: string, options?: { syncToBothDri
           excludedLanguages: [],
         };
         const bodyStr = JSON.stringify(body);
-        logger.info('Driver preferences save payload', {
-          typeof_preference_tags: typeof body.preference_tags,
-          Array_isArray: Array.isArray(body.preference_tags),
-          preference_tags: body.preference_tags,
-          bodyStrLength: bodyStr.length,
-          bodyStrPreview: bodyStr.slice(0, 120),
-        });
-        const ids = syncToBoth ? BOTH_DRIVER_IDS : [driverId];
-        const results = await Promise.all(
-          ids.map(async (id) => {
-            const url = `${API_BASE}/context-engine/driver-preferences/${encodeURIComponent(id)}`;
-            const opts = {
-              headers: apiHeaders({ 'Content-Type': 'application/json' }),
+        if (useMeApi) {
+          const token = await SecureStore.getItemAsync(getAuthTokenKey());
+          if (!token) throw new Error('Not signed in');
+          let res = await fetch(`${API_BASE}/context-engine/me/driver-preferences`, {
+            method: 'PATCH',
+            headers: authHeaders(token),
+            body: bodyStr,
+          });
+          if (res.status === 404) {
+            res = await fetch(`${API_BASE}/context-engine/me/driver-preferences`, {
+              method: 'POST',
+              headers: authHeaders(token),
               body: bodyStr,
-            };
-            let res = await fetch(url, { ...opts, method: 'PATCH' });
-            if (res.status === 404) {
-              res = await fetch(url, { ...opts, method: 'POST' });
-            }
-            return res;
-          })
-        );
-        const failed = results.find((r) => !r.ok);
-        if (failed) {
-          const text = await failed.text();
-          logger.error('Driver preferences save failed', { status: failed.status, body: text });
-          throw new Error(`Save failed: ${failed.status} ${text}`);
+            });
+          }
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Save failed: ${res.status} ${text}`);
+          }
+          logger.info('Driver preferences saved', { preference_tags: body.preference_tags });
+        } else {
+          const ids = syncToBoth ? BOTH_DRIVER_IDS : [driverId];
+          const results = await Promise.all(
+            ids.map(async (id) => {
+              const url = `${API_BASE}/context-engine/driver-preferences/${encodeURIComponent(id)}`;
+              const opts = {
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
+                body: bodyStr,
+              };
+              let res = await fetch(url, { ...opts, method: 'PATCH' });
+              if (res.status === 404) {
+                res = await fetch(url, { ...opts, method: 'POST' });
+              }
+              return res;
+            })
+          );
+          const failed = results.find((r) => !r.ok);
+          if (failed) {
+            const text = await failed.text();
+            logger.error('Driver preferences save failed', { status: failed.status, body: text });
+            throw new Error(`Save failed: ${failed.status} ${text}`);
+          }
+          logger.info('Driver preferences saved', { driverIds: ids, preference_tags: body.preference_tags });
         }
-        logger.info('Driver preferences saved', { driverIds: ids, preference_tags: body.preference_tags });
-        requestRefresh(); // refresh ads immediately so filter takes effect
+        requestRefresh();
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Save failed';
         logger.error('Driver preferences save error', e);
@@ -146,7 +186,7 @@ export function useDriverPreferences(driverId: string, options?: { syncToBothDri
         setSaving(false);
       }
     },
-    [driverId, preferences, syncToBoth]
+    [driverId, preferences, syncToBoth, useMeApi]
   );
 
   return { preferences, loading, saving, saveError, updatePref, refetch: fetchPrefs };

@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-/** Body for POST /drivers/push-token – register Expo push token for a driver */
+/** Body for POST /drivers/push-token – register Expo push token (driverId from JWT) */
 export const registerPushTokenSchema = z.object({
-  driverId: z.string().min(1, 'driverId is required'),
   pushToken: z
     .string()
     .min(1, 'pushToken is required')

@@ -14,7 +14,8 @@ import { connectSocket, updateSocketPosition, disconnectSocket } from '../servic
 import { refreshShelterCache, getNearestCachedShelter, cachedShelterToShelterInfo } from '../services/shelterCache';
 import { scheduleEmergencyAlert } from '../services/emergencyNotificationService';
 import { registerPushToken } from '../services/pushNotificationService';
-import { getApiBase, apiHeaders } from '../services/apiClient';
+import { getApiBase, apiHeaders, authHeaders, getAuthTokenKey } from '../services/apiClient';
+import { decodeJwtPayload } from '../services/authHelpers';
 import { logger } from '../utils/logger';
 import { haversineMeters } from '@smart-dooh/shared-geo';
 
@@ -64,6 +65,8 @@ export function BackgroundDriverLogic() {
   const lastEnqueuedFromLastRef = useRef<string | null>(null);
   const lastSuccessfulRankedLatRef = useRef<number | null>(null);
   const lastSuccessfulRankedLngRef = useRef<number | null>(null);
+  const authTokenRef = useRef<string | null>(null);
+  const driverIdRefFromToken = useRef<string | null>(null);
 
   useLocation();
   useSimulatorPosition();
@@ -76,31 +79,43 @@ export function BackgroundDriverLogic() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    SecureStore.getItemAsync(getAuthTokenKey()).then((token) => {
+      if (!cancelled) {
+        authTokenRef.current = token;
+        driverIdRefFromToken.current = token ? decodeJwtPayload(token)?.driverId ?? null : null;
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        SecureStore.getItemAsync(getAuthTokenKey()).then((token) => {
+          authTokenRef.current = token;
+          driverIdRefFromToken.current = token ? decodeJwtPayload(token)?.driverId ?? null : null;
+          registerPushToken(token).catch(() => {});
+        });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // Connect emergency socket once we have a valid position. Register push token so backend can send remote alerts.
-  // Must depend on lat/lng so the effect re-runs when location becomes available.
   const hasConnectedRef = useRef(false);
   useEffect(() => {
     if (hasConnectedRef.current || lat == null || lng == null) return;
     hasConnectedRef.current = true;
-    const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
+    const driverId = isSimulated ? SIMULATOR_DRIVER_ID : (driverIdRefFromToken.current ?? 'driver-1');
     connectSocket(driverId, lat, lng);
-    registerPushToken(driverId).catch(() => {});
+    registerPushToken(authTokenRef.current).catch(() => {});
     return () => {
       disconnectSocket();
       hasConnectedRef.current = false;
     };
   }, [lat, lng, isSimulated]);
-
-  // Re-register push token when app comes to foreground (e.g. after long background) so backend has a fresh token.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (nextState === 'active') {
-        const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
-        registerPushToken(driverId).catch(() => {});
-      }
-    });
-    return () => sub.remove();
-  }, [isSimulated]);
 
   useEffect(() => {
     if (lat == null || lng == null) return;
@@ -144,17 +159,18 @@ export function BackgroundDriverLogic() {
     return () => clearInterval(t);
   }, [isSimulated]);
 
-  // Real-time GPS: POST /driver/location every 7s so backend has current position and area/neighborhood (Google Geocoding)
+  // Real-time GPS: POST /driver/location every 7s (driverId from JWT)
   const DRIVER_LOCATION_INTERVAL_MS = 7000;
   useEffect(() => {
     if (isSimulated || lat == null || lng == null || !geohash) return;
+    const token = authTokenRef.current;
+    if (!token) return;
     const deviceId = deviceIdRef.current ?? `device-${Date.now()}`;
-    const driverId = 'driver-1';
     const send = () => {
       fetch(`${API_BASE}/driver/location`, {
         method: 'POST',
-        headers: apiHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ driverId, deviceId, lat, lng, geohash }),
+        headers: authHeaders(token),
+        body: JSON.stringify({ deviceId, lat, lng, geohash }),
       }).catch((e) => logger.warn('Driver location POST failed', e));
     };
     send();
@@ -168,19 +184,23 @@ export function BackgroundDriverLogic() {
 
   const fetchRanked = useCallback(() => {
     if (lat == null || lng == null || !geohash) return;
+    const token = authTokenRef.current;
+    if (!token && !isSimulated) return;
     const now = Date.now();
     if (now - lastAdFetchTimeRef.current < MIN_FETCH_INTERVAL_MS) return;
     lastAdFetchTimeRef.current = now;
 
     const deviceId = deviceIdRef.current ?? `device-${Date.now()}`;
-    const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
-    const url = `${API_BASE}/ad-selection/ranked?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&geohash=${geohash}&timeHour=${new Date().getHours()}`;
+    const driverId = isSimulated ? SIMULATOR_DRIVER_ID : (driverIdRefFromToken.current ?? 'driver-1');
+    const url = isSimulated
+      ? `${API_BASE}/ad-selection/ranked?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&geohash=${geohash}&timeHour=${new Date().getHours()}`
+      : `${API_BASE}/ad-selection/me/ranked?lat=${lat}&lng=${lng}&geohash=${geohash}&timeHour=${new Date().getHours()}`;
     logger.info('Ranked request', { lat, lng, geohash });
-    /** Longer timeout so ngrok/slow networks can complete; backend must cache result for display page to show same ad. */
+    const headers = isSimulated ? apiHeaders({ 'x-device-id': deviceId }) : authHeaders(token);
     const RANKED_FETCH_TIMEOUT_MS = 30000;
     const ac = new AbortController();
     const timeoutId = setTimeout(() => ac.abort(), RANKED_FETCH_TIMEOUT_MS);
-    fetch(url, { headers: apiHeaders({ 'x-device-id': deviceId }), signal: ac.signal })
+    fetch(url, { headers, signal: ac.signal })
       .then((r) => {
         clearTimeout(timeoutId);
         if (!r.ok) {
@@ -303,18 +323,21 @@ export function BackgroundDriverLogic() {
     if (refreshTrigger > 0) fetchRanked();
   }, [refreshTrigger, fetchRanked]);
 
-  // Sync with display: poll GET /ad-selection/last/driver-1 so the app shows the same ad as the display URL.
-  // Only use "last" when ranked hasn't responded recently (e.g. cellular failures) to avoid flip-flopping.
-  const driverIdForLast = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
+  // Sync with display: poll GET /ad-selection/me/last (or last/:driverId in simulator) so the app shows the same ad as the display URL.
   useEffect(() => {
+    const token = authTokenRef.current;
+    const driverIdForLast = isSimulated ? SIMULATOR_DRIVER_ID : (driverIdRefFromToken.current ?? 'driver-1');
     const fetchLast = () => {
       const currentSource = useAdStore.getState().adSource;
       const timeSinceRanked = Date.now() - lastAdFetchTimeRef.current;
       if (currentSource === 'ranked' && timeSinceRanked < 30_000) return;
+      if (!isSimulated && !token) return;
 
-      fetch(`${API_BASE}/ad-selection/last/${encodeURIComponent(driverIdForLast)}`, {
-        headers: apiHeaders({ Accept: 'application/json' }),
-      })
+      const url = isSimulated
+        ? `${API_BASE}/ad-selection/last/${encodeURIComponent(driverIdForLast)}`
+        : `${API_BASE}/ad-selection/me/last`;
+      const headers = isSimulated ? apiHeaders({ Accept: 'application/json' }) : authHeaders(token);
+      fetch(url, { headers })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!data?.instructions?.length) return;
@@ -356,7 +379,7 @@ export function BackgroundDriverLogic() {
     fetchLast();
     const t = setInterval(fetchLast, 10000);
     return () => clearInterval(t);
-  }, [driverIdForLast, lat, lng, geohash, setInstructions, enqueue, getQueue, dequeue]);
+  }, [isSimulated, lat, lng, geohash, setInstructions, enqueue, getQueue, dequeue]);
 
   return null;
 }

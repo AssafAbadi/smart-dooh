@@ -28,9 +28,12 @@ export class DriverLocationService {
     private readonly geocoding: GeocodingService,
   ) {}
 
-  async upsertLocation(body: DriverLocationBodyDto): Promise<{ ok: boolean; area?: string; neighborhood?: string }> {
+  async upsertLocation(
+    driverId: string,
+    body: DriverLocationBodyDto,
+  ): Promise<{ ok: boolean; area?: string; neighborhood?: string }> {
     const client = this.redis.getClient() as { setex(key: string, ttl: number, value: string): Promise<unknown> } | null;
-    const key = `${DRIVER_LOCATION_KEY_PREFIX}${body.driverId}`;
+    const key = `${DRIVER_LOCATION_KEY_PREFIX}${driverId}`;
 
     let geo: ReverseGeocodeResult | null = null;
     try {
@@ -50,7 +53,7 @@ export class DriverLocationService {
     };
 
     if (client) {
-      const posKey = `${DRIVER_POSITION_KEY_PREFIX}${body.driverId}`;
+      const posKey = `${DRIVER_POSITION_KEY_PREFIX}${driverId}`;
       await Promise.all([
         client.setex(key, DRIVER_LOCATION_TTL_SEC, JSON.stringify(payload)),
         client.setex(posKey, DRIVER_POSITION_TTL_SEC, JSON.stringify({ lat: body.lat, lng: body.lng, updatedAt: Date.now() })),
@@ -58,7 +61,7 @@ export class DriverLocationService {
     }
 
     this.logger.log({
-      driverId: body.driverId,
+      driverId,
       lat: body.lat,
       lng: body.lng,
       area: payload.area,
