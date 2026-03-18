@@ -253,6 +253,10 @@ The backend sends **Expo push notifications** to all drivers who have registered
    - **Expo Go** may not show push notifications for custom backends or may require the app to be in the foreground. For reliable push when the app is closed or in the background, use a **development build** (e.g. `eas build --profile development`) with FCM (Android) / APNs (iOS) configured.
 4. **Test mode**
    - For test alerts to send push to **offline** drivers (app closed), set **`EMERGENCY_SHOW_ALL_ISRAEL_ALERTS=true`** in backend `.env`. Otherwise only drivers with a **recent** last-known location (Redis, ~5 min TTL) in the alert zone get push.
+5. **Push not arriving after a long time (e.g. 1 hour) in background**
+   - The **"Heartbeat failed"** message is unrelated to push: it means the app couldn’t reach the backend (e.g. network change, ngrok expired). Push is sent from the backend to Expo → your device; it doesn’t depend on the app’s heartbeat. We log heartbeat failures as a warning so they don’t look like the main error.
+   - After long background, open the app once so it can **re-register** the push token with the backend (we do this when the app comes to foreground). Then push should work again for the next alarm.
+   - If an alarm happened and you didn’t get a push, check **backend logs** for that time: "Sending push to offline drivers" and "Push batch completed" mean the backend sent; if you see "No drivers with push tokens", open the app and re-enter the main screen to register again.
 
 1. **Backend was not running** or was **restarted after the alarm ended**. The API usually clears the alert from the feed within 1–2 minutes, so if the backend was down or restarted later, it never saw the data.
 2. **Area filter (before you set EMERGENCY_SHOW_ALL_ISRAEL_ALERTS).** By default we only process alerts whose area is in the Tel Aviv list. An alarm in the **north** would have been ignored unless `EMERGENCY_SHOW_ALL_ISRAEL_ALERTS=true` was set **before** that alarm.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useLocationStore } from '../stores/locationStore';
 import { useAdStore } from '../stores/adStore';
@@ -90,6 +91,17 @@ export function BackgroundDriverLogic() {
     };
   }, [lat, lng, isSimulated]);
 
+  // Re-register push token when app comes to foreground (e.g. after long background) so backend has a fresh token.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        const driverId = isSimulated ? SIMULATOR_DRIVER_ID : 'driver-1';
+        registerPushToken(driverId).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [isSimulated]);
+
   useEffect(() => {
     if (lat == null || lng == null) return;
     updateSocketPosition(lat, lng);
@@ -127,7 +139,7 @@ export function BackgroundDriverLogic() {
         method: 'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ deviceId, driverId }),
-      }).catch((e) => logger.error('Heartbeat failed', e));
+      }).catch((e) => logger.warn('Heartbeat failed (app may be in background or backend unreachable)', e));
     }, 120000);
     return () => clearInterval(t);
   }, [isSimulated]);
