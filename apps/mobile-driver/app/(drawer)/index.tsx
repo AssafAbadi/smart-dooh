@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Linking, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Linking, Pressable, Platform, Animated, Alert } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocationStore } from '../../src/stores/locationStore';
 import { useAdStore } from '../../src/stores/adStore';
@@ -205,19 +206,40 @@ export default function HomeScreen() {
     return () => clearInterval(id);
   }, [driverId, instructions, simulatorMode]);
 
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isOnline) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.35, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isOnline, pulseAnim]);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.card}>
         <Text style={styles.label}>Status</Text>
-        <View style={[styles.badge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
-          <Text style={styles.badgeText}>{isOnline ? 'Online' : 'Offline'}</Text>
+        <View style={styles.statusRow}>
+          {isOnline ? (
+            <Animated.View style={[styles.pulseDot, { transform: [{ scale: pulseAnim }] }]} />
+          ) : null}
+          <View style={[styles.badge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
+            <Text style={styles.badgeText}>{isOnline ? 'Online' : 'Offline'}</Text>
+          </View>
         </View>
         {isSimulated && (
           <Text style={styles.hint}>Simulator mode – position from PC drive</Text>
         )}
       </View>
       <View style={styles.card}>
-        <Text style={styles.label}>Current ad</Text>
+        <View style={styles.adCardHeader}>
+          <Text style={styles.label}>Current ad</Text>
+          {slot1 ? <Text style={styles.liveLabel}>Live Broadcast</Text> : null}
+        </View>
         {adSource === 'ranked' && (
           <Text style={styles.adSourceHint}>From your location (nearby)</Text>
         )}
@@ -233,7 +255,6 @@ export default function HomeScreen() {
         <Text style={styles.amount}>
           {dailyEarnings != null ? `₪${dailyEarnings.toFixed(2)}` : '—'}
         </Text>
-        <Text style={styles.hint}>Payouts and total earnings in Earnings & Payments</Text>
       </View>
       {driverId ? (
         <View style={styles.card}>
@@ -241,12 +262,20 @@ export default function HomeScreen() {
           <Text style={styles.hint}>Open this link on a TV, tablet, or browser to show the same ad as here. Uses your account.</Text>
           <Pressable
             style={({ pressed }) => [styles.displayUrlWrap, pressed && styles.displayUrlPressed]}
-            onPress={() => {
+            onPress={async () => {
               const url = `${getApiBase()}/display/${encodeURIComponent(driverId)}`;
               if (Platform.OS === 'web') {
                 window.open(url, '_blank');
-              } else {
-                Linking.openURL(url);
+                return;
+              }
+              try {
+                await WebBrowser.openBrowserAsync(url);
+              } catch {
+                try {
+                  await Linking.openURL(url);
+                } catch (e) {
+                  Alert.alert('Could not open link', `Copy and open in your browser:\n${url}`, [{ text: 'OK' }]);
+                }
               }
             }}
           >
@@ -263,22 +292,33 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 32 },
+  content: { padding: 20, paddingBottom: 32 },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: colors.surfaceGlass,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderGlass,
   },
   label: {
     color: colors.textMuted,
     fontSize: 12,
+    fontWeight: '700',
     marginBottom: 8,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,180,0,0.9)',
+  },
   badge: {
-    alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
@@ -292,6 +332,17 @@ const styles = StyleSheet.create({
   badgeText: {
     color: colors.text,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  adCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  liveLabel: {
+    color: colors.accent,
+    fontSize: 11,
     fontWeight: '600',
   },
   amount: {
@@ -319,9 +370,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     backgroundColor: colors.background,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderGlass,
   },
   displayUrlPressed: {
     opacity: 0.8,

@@ -101,53 +101,68 @@ export function AdSlot({ instruction, placeholders = {}, heading, userLat, userL
       <Text style={styles.headline} numberOfLines={2}>{headline}</Text>
       {body ? <Text style={styles.body} numberOfLines={3}>{body}</Text> : null}
       {arrowChar ? <Text style={styles.directionArrow}>{arrowChar}</Text> : null}
-      {coupon ? <Text style={styles.coupon}>{coupon}</Text> : null}
+      {coupon ? (
+        <View style={styles.couponPill}>
+          <Text style={styles.couponPillText}>{coupon}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   slot: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.surfaceGlass,
+    borderRadius: 16,
+    padding: 16,
     minHeight: 120,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderGlass,
   },
   placeholderLabel: {
     color: colors.textMuted,
     fontSize: 14,
-    fontFamily: 'monospace',
+    fontWeight: '500',
   },
   image: {
     width: '100%',
     height: 80,
-    borderRadius: 4,
+    borderRadius: 8,
     marginBottom: 8,
   },
   headline: {
     color: colors.text,
-    fontSize: 16,
-    fontFamily: 'monospace',
+    fontSize: 17,
+    fontWeight: '700',
     marginBottom: 4,
   },
   body: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontFamily: 'monospace',
+    fontSize: 14,
+    fontWeight: '500',
     marginBottom: 4,
   },
   directionArrow: {
-    color: '#0af',
+    color: '#007AFF',
     fontSize: 64,
     fontWeight: '700',
     marginVertical: 8,
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 122, 255, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
-  coupon: {
-    color: colors.accent,
-    fontSize: 12,
-    fontFamily: 'monospace',
+  couponPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  couponPillText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

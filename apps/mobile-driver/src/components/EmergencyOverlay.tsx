@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { useEmergencyStore } from '../stores/emergencyStore';
 import { useLocationStore } from '../stores/locationStore';
 import { getNearestCachedShelter } from '../services/shelterCache';
@@ -96,6 +96,19 @@ export function EmergencyOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shelter identity via primitives only
   }, [isAlertActive, shelterLat, shelterLng, shelterAddress, lat, lng, heading]);
 
+  const openNavigation = useCallback(() => {
+    let navLat = shelter?.lat ?? 0;
+    let navLng = shelter?.lng ?? 0;
+    if ((navLat === 0 && navLng === 0) && lat != null && lng != null) {
+      const cached = getNearestCachedShelter(lat, lng);
+      if (cached) {
+        navLat = cached.lat;
+        navLng = cached.lng;
+      }
+    }
+    openGoogleMapsNavigation(navLat, navLng);
+  }, [shelter?.lat, shelter?.lng, lat, lng]);
+
   if (!isAlertActive || !shelter) return null;
 
   const displayDistance = liveDistance ?? shelter.distanceMeters;
@@ -124,6 +137,10 @@ export function EmergencyOverlay() {
           </Text>
           <Text style={styles.distanceSubtext}>straight-line</Text>
         </View>
+
+        <Pressable style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]} onPress={openNavigation}>
+          <Text style={styles.navButtonText}>Navigate to Shelter</Text>
+        </Pressable>
 
         <Text style={styles.instruction}>
           Head {liveDirection === 'up' ? 'forward' : liveDirection === 'down' ? 'behind you' : liveDirection} to the nearest shelter
@@ -157,14 +174,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   alertType: {
-    color: '#FFD700',
-    fontSize: 32,
+    color: '#FFFFFF',
+    fontSize: 34,
     fontWeight: '900',
     letterSpacing: 3,
   },
   alertTypeHe: {
-    color: '#FFD700',
-    fontSize: 28,
+    color: '#FFFFFF',
+    fontSize: 30,
     fontWeight: '800',
     marginTop: 4,
   },
@@ -176,13 +193,13 @@ const styles = StyleSheet.create({
   },
   headline: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
     marginBottom: 20,
   },
   arrow: {
-    color: '#FFD700',
+    color: '#FFFFFF',
     fontSize: 120,
     fontWeight: '900',
     lineHeight: 130,
@@ -204,14 +221,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   distanceBadge: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 24,
     paddingVertical: 12,
     marginVertical: 12,
   },
   distanceText: {
-    color: '#000000',
+    color: '#1a1a1a',
     fontSize: 36,
     fontWeight: '900',
   },
@@ -220,11 +237,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  navButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    marginTop: 20,
+    minWidth: 280,
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  navButtonPressed: {
+    opacity: 0.9,
+  },
+  navButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
   instruction: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: 16,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 20,
     paddingHorizontal: 32,
   },
   bottomBand: {
@@ -235,7 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottomText: {
-    color: '#FFD700',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },

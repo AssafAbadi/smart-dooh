@@ -52,7 +52,7 @@ export default function PreferencesScreen() {
       {loading ? (
         <Text style={styles.hint}>Loading…</Text>
       ) : (
-        <View style={styles.filterBlock}>
+        <View style={styles.filterCard}>
           <FilterRow label="Vegan only" value={preferences.pref_veganOnly} onValueChange={(v) => updatePref('pref_veganOnly', v)} />
           <FilterRow label="Vegetarian only" value={preferences.pref_vegetarianOnly} onValueChange={(v) => updatePref('pref_vegetarianOnly', v)} />
           <FilterRow label="Kosher only" value={preferences.pref_kosherOnly} onValueChange={(v) => updatePref('pref_kosherOnly', v)} />
@@ -67,22 +67,31 @@ export default function PreferencesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  inner: { padding: 16 },
+  inner: { padding: 20, paddingBottom: 32 },
   intro: {
     color: colors.textMuted,
     fontSize: 14,
-    marginBottom: 16,
+    fontWeight: '500',
+    marginBottom: 20,
   },
   hint: { color: colors.textMuted, fontSize: 14, marginBottom: 16 },
   error: { color: colors.accent, fontSize: 13, marginBottom: 12 },
-  filterBlock: { marginBottom: 24 },
+  filterCard: {
+    backgroundColor: colors.surfaceGlass,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderGlass,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    marginBottom: 24,
+  },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderGlass,
   },
-  filterLabel: { color: colors.text, fontSize: 16 },
+  filterLabel: { color: colors.text, fontSize: 16, fontWeight: '500' },
 });

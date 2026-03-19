@@ -1,6 +1,6 @@
 /**
  * Returns the billboard display HTML. Inline CSS/JS so a single GET serves the full page.
- * High-contrast (yellow/white on black), large typography for viewing from across the room.
+ * Premium dark theme: glassmorphism card, Electric Blue (#007AFF) accent, no yellow/purple.
  */
 export function getDisplayHtml(driverId: string): string {
   const escapedDriverId = escapeHtml(driverId);
@@ -17,88 +17,111 @@ export function getDisplayHtml(driverId: string): string {
       width: 100%;
     }
     body {
-      background: #000;
+      background: #0a0a0c;
       color: #fff;
       font-family: system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: clamp(0.5rem, 2vw, 1rem);
+      padding: clamp(1rem, 4vw, 2rem);
       overflow-y: auto;
       overflow-x: hidden;
       min-height: 100vh;
     }
     .slot {
       text-align: center;
-      max-width: min(100vw, 960px);
+      max-width: min(90vw, 960px);
       width: 100%;
       padding: 0 4vw;
       word-wrap: break-word;
       overflow-wrap: anywhere;
       flex-shrink: 0;
     }
-    .headline {
-      color: #fff;
-      font-size: clamp(2.2rem, 7vw, 4.5rem);
-      font-weight: 700;
-      line-height: 1.15;
-      margin-bottom: 0.2em;
-      text-shadow: 0 0 20px rgba(255,255,255,0.2);
+    .display-card {
+      background: rgba(28, 30, 34, 0.92);
+      border: 1px solid #333;
+      border-radius: 20px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+      padding: clamp(1.5rem, 5vw, 3rem);
+      width: 100%;
     }
-    .body {
-      color: #e0e0e0;
-      font-size: clamp(1.2rem, 3.5vw, 2.3rem);
-      line-height: 1.4;
+    .card-headline {
+      color: #fff;
+      font-size: clamp(2.5rem, 8vw, 5rem);
+      font-weight: 700;
+      line-height: 1.1;
       margin-bottom: 0.15em;
     }
+    .card-subhead {
+      color: #e0e0e0;
+      font-size: clamp(1.1rem, 3.5vw, 2rem);
+      font-weight: 500;
+      line-height: 1.3;
+      margin-bottom: 0.4em;
+    }
+    .coupon-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+      background: #007AFF;
+      color: #fff;
+      font-size: clamp(1.4rem, 4vw, 2.5rem);
+      font-weight: 700;
+      border-radius: 12px;
+      padding: 0.4em 0.8em;
+      margin: 0.3em 0;
+      cursor: pointer;
+    }
+    .coupon-pill:hover { opacity: 0.95; }
+    .copy-icon { font-size: 0.85em; opacity: 0.9; }
     .direction-arrow {
-      color: #0af;
-      font-size: clamp(7.5rem, 24vw, 13.5rem);
+      color: #007AFF;
+      font-size: clamp(6rem, 20vw, 11rem);
       font-weight: 700;
       line-height: 1;
-      margin: 0.05em 0;
-      text-shadow: 0 0 24px rgba(0,170,255,0.5);
+      margin: 0.1em 0;
+      text-shadow: 0 0 32px rgba(0, 122, 255, 0.5);
     }
-    .coupon {
-      color: #fff;
-      font-size: clamp(1.6rem, 4.5vw, 3rem);
-      font-weight: 700;
-      margin-top: 0.2em;
+    .card-details {
+      color: #A0A0A0;
+      font-size: clamp(0.95rem, 2.5vw, 1.5rem);
+      line-height: 1.4;
+      margin-top: 0.3em;
     }
+    .headline { color: #fff; font-size: clamp(2.2rem, 7vw, 4.5rem); font-weight: 700; line-height: 1.15; margin-bottom: 0.2em; }
+    .body { color: #e0e0e0; font-size: clamp(1.2rem, 3.5vw, 2.3rem); line-height: 1.4; margin-bottom: 0.15em; }
+    .coupon { color: #fff; font-size: clamp(1.6rem, 4.5vw, 3rem); font-weight: 700; margin-top: 0.2em; }
     .slot.fade-enter { animation: fadeIn 0.8s ease-out forwards; }
-    .slot.fade-exit { animation: fadeOut 0.5s ease-in forwards; }
     @keyframes fadeIn {
       from { opacity: 0; transform: scale(0.98); }
       to { opacity: 1; transform: scale(1); }
     }
-    @keyframes fadeOut {
-      from { opacity: 1; }
-      to { opacity: 0; }
-    }
     .placeholder { color: #666; font-size: clamp(1.2rem, 3vw, 2rem); }
-    /* Emergency alert: red and yellow like the app – fit viewport, no scroll */
+    /* Emergency: red only, no yellow – white for accents */
     body.emergency { background: #CC0000; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; padding: 0; }
     body.emergency .slot { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(0.5rem, 1.5vh, 1rem) 4vw; }
     body.emergency .emergency-topBand { background: #990000; width: 100%; padding: clamp(0.4rem, 1.2vh, 1rem) 0; text-align: center; flex-shrink: 0; }
-    body.emergency .emergency-alertType { color: #FFD700; font-size: clamp(1rem, 2.8vh, 2.5rem); font-weight: 900; letter-spacing: 0.05em; }
-    body.emergency .emergency-alertTypeHe { color: #FFD700; font-size: clamp(0.85rem, 2.2vh, 2rem); font-weight: 800; margin-top: 0.1rem; }
+    body.emergency .emergency-alertType { color: #FFFFFF; font-size: clamp(1rem, 2.8vh, 2.5rem); font-weight: 900; letter-spacing: 0.05em; }
+    body.emergency .emergency-alertTypeHe { color: #FFFFFF; font-size: clamp(0.85rem, 2.2vh, 2rem); font-weight: 800; margin-top: 0.1rem; }
     body.emergency .emergency-headline { color: #fff; font-size: clamp(0.7rem, 2vh, 1.4rem); font-weight: 600; margin: 0.2rem 0; }
-    body.emergency .emergency-arrow { color: #FFD700; font-size: clamp(3rem, 12vh, 9rem); font-weight: 900; line-height: 1; margin: 0.1em 0; flex-shrink: 0; }
+    body.emergency .emergency-arrow { color: #FFFFFF; font-size: clamp(3rem, 12vh, 9rem); font-weight: 900; line-height: 1; margin: 0.1em 0; flex-shrink: 0; }
     body.emergency .emergency-shelterLabel { color: rgba(255,255,255,0.8); font-size: clamp(0.65rem, 1.8vh, 1rem); font-weight: 600; letter-spacing: 0.1em; margin-top: 0.2rem; }
     body.emergency .emergency-address { color: #fff; font-size: clamp(0.75rem, 2.2vh, 1.6rem); font-weight: 700; margin: 0.2rem 0 0.3rem; }
-    body.emergency .emergency-distanceBadge { background: #FFD700; color: #000; border-radius: 12px; padding: 0.35rem 1rem; margin: 0.3rem 0; display: inline-block; }
+    body.emergency .emergency-distanceBadge { background: #FFFFFF; color: #1a1a1a; border-radius: 12px; padding: 0.35rem 1rem; margin: 0.3rem 0; display: inline-block; }
     body.emergency .emergency-distanceText { font-size: clamp(1rem, 3vh, 2.5rem); font-weight: 900; }
     body.emergency .emergency-distanceSubtext { font-size: 0.6rem; color: rgba(0,0,0,0.6); }
     body.emergency .emergency-instruction { color: rgba(255,255,255,0.9); font-size: clamp(0.7rem, 2vh, 1.1rem); margin-top: 0.2rem; }
     body.emergency .emergency-bottomBand { background: #990000; width: 100%; padding: clamp(0.4rem, 1.2vh, 1rem) 0; text-align: center; flex-shrink: 0; }
-    body.emergency .emergency-bottomText { color: #FFD700; font-size: clamp(0.7rem, 2vh, 1rem); font-weight: 600; }
+    body.emergency .emergency-bottomText { color: #FFFFFF; font-size: clamp(0.7rem, 2vh, 1rem); font-weight: 600; }
   </style>
 </head>
 <body>
   <div id="root" class="slot">
-    <div class="headline">Loading…</div>
-    <div class="body">Fetching ads for ${escapedDriverId}</div>
+    <div class="display-card">
+      <div class="card-headline">Loading…</div>
+      <div class="body">Fetching ads for ${escapedDriverId}</div>
+    </div>
   </div>
   <script>
     const driverId = ${JSON.stringify(driverId)};
@@ -121,10 +144,14 @@ export function getDisplayHtml(driverId: string): string {
       var code = instruction.couponCode || '—';
       return text.split('[DISTANCE]').join(distForBody).split('[TIME_LEFT]').join('—').split('[COUPON_CODE]').join(code);
     }
+    function copyCoupon(code) {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code);
+    }
+    window.copyCoupon = copyCoupon;
     function render(instruction, useFade) {
       if (!instruction) {
         document.body.classList.remove('emergency');
-        root.innerHTML = '<div class="headline">No ad</div><div class="body">No active campaign in range.</div>';
+        root.innerHTML = '<div class="display-card"><div class="card-headline">No ad</div><div class="card-details">No active campaign in range.</div></div>';
         lastAdKey = '';
         return;
       }
@@ -157,16 +184,23 @@ export function getDisplayHtml(driverId: string): string {
       var bodyRawAd = replacePlaceholders(instruction.body || '', instruction, true);
       var headline = escapeHtml(headlineRawAd);
       var bodyEscaped = escapeHtml(bodyRawAd);
-      var coupon = escapeHtml(instruction.couponCode || '');
+      var couponCode = instruction.couponCode || '';
+      var coupon = escapeHtml(couponCode);
       var arrowCharAd = instruction.direction && DIRECTION_ARROWS[instruction.direction] ? DIRECTION_ARROWS[instruction.direction] : '';
       var arrowBlock = arrowCharAd ? '<div class="direction-arrow">' + escapeHtml(arrowCharAd) + '</div>' : '';
-      root.innerHTML = '<div class="headline">' + headline + '</div><div class="body">' + bodyEscaped + '</div>' + arrowBlock + (coupon ? '<div class="coupon">' + coupon + '</div>' : '');
+      var couponBlock = couponCode ? '<div class="coupon-pill" onclick="copyCoupon(' + JSON.stringify(couponCode) + ')">' + coupon + ' <span class="copy-icon" aria-hidden="true">⎘</span></div>' : '';
+      root.innerHTML = '<div class="display-card">' +
+        '<div class="card-headline">' + headline + '</div>' +
+        couponBlock +
+        arrowBlock +
+        '<div class="card-details">' + bodyEscaped + '</div>' +
+        '</div>';
     }
 
     var fetchTimeout = 12000;
 
     function showMirror() {
-      root.innerHTML = '<div class="headline">Mirror</div><div class="body">Open the app with this driver. The ad shown in the app will appear here within a few seconds.</div>';
+      root.innerHTML = '<div class="display-card"><div class="card-headline">Mirror</div><div class="card-details">Open the app with this driver. The ad shown in the app will appear here within a few seconds.</div></div>';
     }
 
     function fetchAds() {
@@ -176,7 +210,7 @@ export function getDisplayHtml(driverId: string): string {
       var timeoutId = setTimeout(function() {
         timedOut = true;
         if (lastAdKey === '') {
-          root.innerHTML = '<div class="headline">Connecting…</div><div class="body">No response yet. Open the app with this driver or check the server. Retrying every 5s.</div>';
+          root.innerHTML = '<div class="display-card"><div class="card-headline">Connecting…</div><div class="card-details">No response yet. Open the app with this driver or check the server. Retrying every 5s.</div></div>';
         }
       }, fetchTimeout);
       fetch(API_BASE + '/ad-selection/last/' + encodeURIComponent(driverId) + '?t=' + Date.now(), { headers: headers })
@@ -207,7 +241,7 @@ export function getDisplayHtml(driverId: string): string {
         .catch(function() {
           clearTimeout(timeoutId);
           if (!lastAdKey) {
-            root.innerHTML = '<div class="headline">Offline</div><div class="body">Cannot reach server. Retrying in 5s.</div>';
+            root.innerHTML = '<div class="display-card"><div class="card-headline">Offline</div><div class="card-details">Cannot reach server. Retrying in 5s.</div></div>';
           }
         });
     }

@@ -98,5 +98,18 @@ export function useDriverTotalEarnings(driverId: string | null) {
     refetch();
   }, [driverId, refetch]);
 
+  // Poll every 30s so stale responses self-correct without requiring navigation
+  useEffect(() => {
+    if (!driverId) return;
+    const t = setInterval(() => {
+      const start = new Date(2020, 0, 1);
+      const end = new Date();
+      fetchEarnings(driverId, start, end)
+        .then((v) => setEarnings(v))
+        .catch((e) => logger.warn('Total earnings poll failed', { driverId, err: e instanceof Error ? e.message : e }));
+    }, 30000);
+    return () => clearInterval(t);
+  }, [driverId]);
+
   return { earnings, loading, error, refetch };
 }
